@@ -63,6 +63,7 @@ import org.neo4j.kernel.ha.Master;
 import org.neo4j.kernel.ha.MasterIdGeneratorFactory;
 import org.neo4j.kernel.ha.MasterServer;
 import org.neo4j.kernel.ha.MasterTxHook;
+import org.neo4j.kernel.ha.SlaveRecoveryVerifier;
 import org.neo4j.kernel.ha.MasterTxIdGenerator.MasterTxIdGeneratorFactory;
 import org.neo4j.kernel.ha.ResponseReceiver;
 import org.neo4j.kernel.ha.SlaveIdGenerator.SlaveIdGeneratorFactory;
@@ -83,6 +84,7 @@ import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource;
 import org.neo4j.kernel.impl.transaction.XaDataSourceManager;
 import org.neo4j.kernel.impl.transaction.xaframework.LogIoUtils;
 import org.neo4j.kernel.impl.transaction.xaframework.NoSuchLogVersionException;
+import org.neo4j.kernel.impl.transaction.xaframework.RecoveryVerificationException;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 import org.neo4j.kernel.impl.transaction.xaframework.XaLogicalLog;
 import org.neo4j.kernel.impl.util.FileUtils;
@@ -739,7 +741,15 @@ public class HAGraphDb extends AbstractGraphDatabase
                 {   // I am currently master, so restart as slave.
                     // This will result in clearing of free ids from .id files, see SlaveIdGenerator.
                     internalShutdown( true );
-                    newDb = startAsSlave( storeId, master );
+                    try
+                    {
+                        newDb = startAsSlave( storeId, master );
+                    }
+                    catch ( RecoveryVerificationException e )
+                    {
+                        getMessageLog().logMessage( "Verification of recovered transactions didn't pass, getting new from master", e );
+                        throw new BranchedDataException( e );
+                    }
                 }
                 else
                 {   // I am already a slave, so just forget the ids I got from the previous master
@@ -817,7 +827,8 @@ public class HAGraphDb extends AbstractGraphDatabase
                 new SlaveTxIdGeneratorFactory( broker, this ),
                 new SlaveTxHook( broker, this ),
                 slaveUpdateMode.createUpdater( broker ),
-                CommonFactories.defaultFileSystemAbstraction() );
+                CommonFactories.defaultFileSystemAbstraction(),
+                new SlaveRecoveryVerifier( broker, storeId ) );
         // instantiateAutoUpdatePullerIfConfigSaysSo() moved to
         // reevaluateMyself(), after the local db has been assigned
         logHaInfo( "Started as slave" );
@@ -835,7 +846,8 @@ public class HAGraphDb extends AbstractGraphDatabase
                 new MasterTxIdGeneratorFactory( broker ),
                 new MasterTxHook(),
                 new ZooKeeperLastCommittedTxIdSetter( broker ),
-                CommonFactories.defaultFileSystemAbstraction() );
+                CommonFactories.defaultFileSystemAbstraction(),
+                CommonFactories.defaultRecoveryVerifier() );
         this.masterServer = (MasterServer) broker.instantiateMasterServer( this );
         logHaInfo( "Started as master" );
         this.startupTime = System.currentTimeMillis();
