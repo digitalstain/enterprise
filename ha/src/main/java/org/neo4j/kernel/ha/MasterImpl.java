@@ -133,7 +133,7 @@ public class MasterImpl implements Master
     {
         return this.graphDb;
     }
-    
+
     @Override
     public Response<Void> initializeTx( SlaveContext context )
     {
@@ -181,7 +181,7 @@ public class MasterImpl implements Master
         return packResponse( context, response, MasterUtil.ALL );
     }
 
-    private <T> Response<T> packResponse( SlaveContext context, T response, Predicate<Long> filter )
+    private <T> Response<T> packResponse( SlaveContext context, T response, Predicate<Pair<Long, Integer>> filter )
     {
         return MasterUtil.packResponse( graphDb, context, response, filter );
     }
@@ -281,14 +281,13 @@ public class MasterImpl implements Master
                 finishThisAndResumeOther( otherTx, txId, false );
                 return;
             }
-            
             TransactionManager txManager = graphDb.getTxManager();
-            
+
             // update time stamp to current time so that we know that this tx just completed
             // a request and can now again start to be monitored, so that it can be
             // rolled back if it's getting old.
             tx.updateTime();
-            
+
             txManager.suspend();
             if ( otherTx != null )
             {
@@ -394,11 +393,13 @@ public class MasterImpl implements Master
             XaDataSource dataSource = graphDb.getXaDataSourceManager()
                     .getXaDataSource( resource );
             final long txId = dataSource.applyPreparedTransaction( txGetter.extract() );
-            Predicate<Long> upUntilThisTx = new Predicate<Long>()
+            final int slaveMachineId = context.machineId();
+            Predicate<Pair<Long, Integer>> upUntilThisTx = new Predicate<Pair<Long, Integer>>()
             {
-                public boolean accept( Long item )
+                public boolean accept( Pair<Long, Integer> item )
                 {
-                    return item < txId;
+                    return item.first() < txId;// && item.other() !=
+                                               // slaveMachineId;
                 }
             };
             return packResponse( context, txId, upUntilThisTx );
@@ -425,7 +426,7 @@ public class MasterImpl implements Master
             transactions.get( context ).markAsFinishAsap();
             throw e;
         }
-        
+
         finishThisAndResumeOther( otherTx, context, success );
         return packResponse( context, null );
     }
@@ -532,33 +533,33 @@ public class MasterImpl implements Master
         }
         return result;
     }
-    
+
     static class MasterTransaction
     {
         private final Transaction transaction;
         private final AtomicLong timeLastSuspended = new AtomicLong();
         private volatile boolean finishAsap;
-        
+
         MasterTransaction( Transaction transaction )
         {
             this.transaction = transaction;
         }
-        
+
         void updateTime()
         {
             this.timeLastSuspended.set( System.currentTimeMillis() );
         }
-        
+
         void resetTime()
         {
             this.timeLastSuspended.set( 0 );
         }
-        
+
         void markAsFinishAsap()
         {
             this.finishAsap = true;
         }
-        
+
         boolean finishAsap()
         {
             return this.finishAsap;

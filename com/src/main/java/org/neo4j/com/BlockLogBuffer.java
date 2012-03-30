@@ -120,9 +120,14 @@ public class BlockLogBuffer implements LogBuffer
 
     public LogBuffer put( byte[] bytes ) throws IOException
     {
-        for ( int pos = 0; pos < bytes.length; )
+        return put( bytes, bytes.length );
+    }
+
+    public LogBuffer put( byte[] bytes, int length ) throws IOException
+    {
+        for ( int pos = 0; pos < length; )
         {
-            int toWrite = Math.min( byteBuffer.remaining(), bytes.length - pos );
+            int toWrite = Math.min( byteBuffer.remaining(), length - pos );
             byteBuffer.put( bytes, pos, toWrite );
             checkFlush();
             pos += toWrite;
