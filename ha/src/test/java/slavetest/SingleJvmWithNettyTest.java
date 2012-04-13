@@ -17,18 +17,8 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package slavetest;
 
-import static java.util.Arrays.asList;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.neo4j.helpers.collection.MapUtil.stringMap;
-import static org.neo4j.kernel.HaConfig.CONFIG_KEY_LOCK_READ_TIMEOUT;
-import static org.neo4j.kernel.HaConfig.CONFIG_KEY_READ_TIMEOUT;
+package slavetest;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -36,14 +26,16 @@ import java.io.FileReader;
 import java.rmi.RemoteException;
 import java.util.Collection;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.neo4j.com.Client;
 import org.neo4j.com.Client.ConnectionLostHandler;
+import org.neo4j.com.ComException;
 import org.neo4j.com.Protocol;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
@@ -51,15 +43,17 @@ import org.neo4j.graphdb.NotFoundException;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.TransactionFailureException;
+import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.collection.IteratorUtil;
 import org.neo4j.helpers.collection.MapUtil;
-import org.neo4j.kernel.Config;
-import org.neo4j.kernel.ConfigProxy;
-import org.neo4j.kernel.GraphDatabaseSPI;
+import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.HighlyAvailableGraphDatabase;
+import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.configuration.ConfigurationDefaults;
 import org.neo4j.kernel.ha.AbstractBroker;
 import org.neo4j.kernel.ha.Broker;
+import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.Master;
 import org.neo4j.kernel.ha.MasterClient;
 import org.neo4j.kernel.ha.MasterImpl;
@@ -70,6 +64,11 @@ import org.neo4j.kernel.impl.transaction.LockType;
 import org.neo4j.kernel.impl.transaction.TxManager;
 import org.neo4j.kernel.impl.util.FileUtils;
 import org.neo4j.kernel.impl.util.StringLogger;
+
+import static java.util.Arrays.*;
+import static java.util.concurrent.Executors.*;
+import static org.junit.Assert.*;
+import static org.neo4j.helpers.collection.MapUtil.*;
 
 public class SingleJvmWithNettyTest extends SingleJvmTest
 {
@@ -94,20 +93,19 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
     protected Broker makeSlaveBroker( TestMaster master, int masterId, int id, HighlyAvailableGraphDatabase db, Map<String, String> config )
     {
         config.put( "server_id", Integer.toString( id ) );
-        AbstractBroker.Configuration conf = ConfigProxy.config( config, AbstractBroker.Configuration.class );
-        
+
         final Machine masterMachine = new Machine( masterId, -1, 1, -1,
                 "localhost:" + Protocol.PORT );
-        int readTimeout = getConfigInt( config, CONFIG_KEY_READ_TIMEOUT, TEST_READ_TIMEOUT );
+        int readTimeout = getConfigInt( config, HaSettings.read_timeout.name(), TEST_READ_TIMEOUT );
         final Master client = new MasterClient(
                 masterMachine.getServer().first(),
                 masterMachine.getServer().other(),
                 db.getMessageLog(),
                 db.getStoreIdGetter(),
                 ConnectionLostHandler.NO_ACTION,
-                readTimeout, getConfigInt( config, CONFIG_KEY_LOCK_READ_TIMEOUT, readTimeout ),
+                readTimeout, getConfigInt( config, HaSettings.lock_read_timeout.name(), readTimeout ),
                 Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT);
-        return new AbstractBroker( conf )
+        return new AbstractBroker( new Config( new ConfigurationDefaults(GraphDatabaseSettings.class, HaSettings.class ).apply( config ) ))
         {
             public boolean iAmMaster()
             {
@@ -130,7 +128,7 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
                 return Pair.of( client, masterMachine );
             }
 
-            public Object instantiateMasterServer( GraphDatabaseSPI graphDb )
+            public Object instantiateMasterServer( GraphDatabaseAPI graphDb )
             {
                 throw new UnsupportedOperationException(
                         "cannot instantiate master server on slave" );
@@ -405,8 +403,8 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
     public void committsAndRollbacksCountCorrectlyOnMaster() throws Exception
     {
         initializeDbs( 1 );
-        GraphDatabaseSPI master = getMaster().getGraphDb();
-        GraphDatabaseSPI slave = getSlave( 0 );
+        GraphDatabaseAPI master = getMaster().getGraphDb();
+        GraphDatabaseAPI slave = getSlave( 0 );
 
         // A successful tx on the master should increment number of commits on master
         Pair<Integer, Integer> masterTxsBefore = getTransactionCounts( master );
@@ -437,7 +435,7 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
     public void individuallyConfigurableLockReadTimeout() throws Exception
     {
         long lockTimeout = 1;
-        initializeDbs( 1, stringMap( CONFIG_KEY_LOCK_READ_TIMEOUT, String.valueOf( lockTimeout ) ) );
+        initializeDbs( 1, stringMap( HaSettings.lock_read_timeout.name(), String.valueOf( lockTimeout ) ) );
         final Long nodeId = executeJobOnMaster( new CommonJobs.CreateNodeJob( true ) );
         final Fetcher<DoubleLatch> latchFetcher = getDoubleLatch();
         pullUpdates();
@@ -477,7 +475,7 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
     public void useLockTimeoutForCleaningUpTransactions() throws Exception
     {
         final long lockTimeout = 1;
-        initializeDbs( 1, stringMap( CONFIG_KEY_LOCK_READ_TIMEOUT, String.valueOf( lockTimeout ) ) );
+        initializeDbs( 1, stringMap( HaSettings.lock_read_timeout.name(), String.valueOf( lockTimeout ) ) );
         final Long nodeId = executeJobOnMaster( new CommonJobs.CreateNodeJob( true ) );
         final Fetcher<DoubleLatch> latchFetcher = getDoubleLatch();
         pullUpdates();
@@ -516,7 +514,7 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
     public void useLockTimeoutToPreventCleaningUpLongRunningTransactions() throws Exception
     {
         final long lockTimeout = 100;
-        initializeDbs( 1, stringMap( CONFIG_KEY_LOCK_READ_TIMEOUT, String.valueOf( lockTimeout ) ) );
+        initializeDbs( 1, stringMap( HaSettings.lock_read_timeout.name(), String.valueOf( lockTimeout ) ) );
         final Long nodeId = executeJobOnMaster( new CommonJobs.CreateNodeJob( true ) );
         final Fetcher<DoubleLatch> latchFetcher = getDoubleLatch();
         pullUpdates();
@@ -543,13 +541,47 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
 
         executeJob( new CommonJobs.HoldLongLock( nodeId, latchFetcher ), 0 );
     }
+    
+    @Test
+    public void lockWaitTimeoutShouldHaveSilentTxFinishRollingBackToNotHideOriginalException() throws Exception
+    {
+        final long lockTimeout = 1;
+        initializeDbs( 1, stringMap( HaSettings.lock_read_timeout.name(), String.valueOf( lockTimeout ) ) );
+        final Long otherNodeId = executeJob( new CommonJobs.CreateNodeJob( true ), 0 );
+        final Fetcher<DoubleLatch> latchFetcher = getDoubleLatch();
+        ExecutorService executor = newFixedThreadPool( 1 );
+        final long refNodeId = getMasterHaDb().getReferenceNode().getId();
+        Future<Void> lockHolder = executor.submit( new Callable<Void>()
+        {
+            @Override
+            public Void call() throws Exception
+            {
+                executeJobOnMaster( new CommonJobs.HoldLongLock( refNodeId, latchFetcher ) );
+                return null;
+            }
+        } );
+        
+        DoubleLatch latch = latchFetcher.fetch();
+        latch.countDownFirst();
+        try
+        {
+            executeJob( new CommonJobs.SetNodePropertyWithThrowJob( otherNodeId.longValue(),
+                    refNodeId, "key", "value" ), 0 );
+            fail( "Should've failed" );
+        }
+        catch ( ComException e )
+        {   // Good
+        }
+        latch.countDownSecond();
+        assertNull( lockHolder.get() );
+    }
 
     @Ignore
     @Test
     public void readLockWithoutTxOnSlaveShouldNotGrabIndefiniteLockOnMaster() throws Exception
     {
         final long lockTimeout = 1;
-        initializeDbs( 1, stringMap( CONFIG_KEY_LOCK_READ_TIMEOUT, String.valueOf( lockTimeout ) ) );
+        initializeDbs( 1, stringMap( HaSettings.lock_read_timeout.name(), String.valueOf( lockTimeout ) ) );
         final long[] id = new long[1];
         final Fetcher<DoubleLatch> latchFetcher = getDoubleLatch();
         Thread lockHolder = new Thread( new Runnable()
@@ -572,8 +604,8 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
                     {
                         tx.finish();
                     }
-                    ( (GraphDatabaseSPI) slaveDb ).getLockManager().getReadLock( node );
-                    ( (GraphDatabaseSPI) slaveDb ).getLockReleaser().addLockToTransaction( node, LockType.READ );
+                    ( (GraphDatabaseAPI) slaveDb ).getLockManager().getReadLock( node );
+                    ( (GraphDatabaseAPI) slaveDb ).getLockReleaser().addLockToTransaction( node, LockType.READ );
                     id[0] = node.getId();
                     latch.countDownFirst();
                     latch.awaitSecond();
@@ -671,7 +703,7 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
         }
     }
 
-    private Pair<Integer, Integer> getTransactionCounts( GraphDatabaseSPI master )
+    private Pair<Integer, Integer> getTransactionCounts( GraphDatabaseAPI master )
     {
         return Pair.of(
             ( (TxManager) master.getTxManager() ).getCommittedTxCount(),

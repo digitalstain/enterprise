@@ -17,18 +17,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.backup;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.fail;
-import static org.neo4j.helpers.collection.MapUtil.stringMap;
-import static org.neo4j.kernel.Config.ENABLE_ONLINE_BACKUP;
+package org.neo4j.backup;
 
 import java.io.File;
 import java.io.FilenameFilter;
-import java.util.Map;
-
 import org.apache.commons.io.FileUtils;
 import org.junit.Before;
 import org.junit.Test;
@@ -37,16 +30,25 @@ import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
+import org.neo4j.graphdb.factory.GraphDatabaseFactory;
+import org.neo4j.graphdb.factory.GraphDatabaseSetting;
+import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.graphdb.index.Index;
+<<<<<<< HEAD
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.Config;
+=======
+import org.neo4j.kernel.AbstractGraphDatabase;
+>>>>>>> master
 import org.neo4j.kernel.EmbeddedGraphDatabase;
-import org.neo4j.kernel.GraphDatabaseSPI;
+import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.test.DbRepresentation;
 import org.neo4j.test.TargetDirectory;
 import org.neo4j.test.subprocess.SubProcess;
+
+import static org.junit.Assert.*;
 
 public class TestBackup
 {
@@ -104,7 +106,7 @@ public class TestBackup
     @Test
     public void backupLeavesLastTxInLog() throws Exception
     {
-        GraphDatabaseSPI db = null;
+        GraphDatabaseAPI db = null;
         ServerInterface server = null;
         try
         {
@@ -154,7 +156,7 @@ public class TestBackup
     @Test
     public void incrementalBackupLeavesOnlyLastTxInLog() throws Exception
     {
-        GraphDatabaseSPI db = null;
+        GraphDatabaseAPI db = null;
         ServerInterface server = null;
         try
         {
@@ -342,8 +344,10 @@ public class TestBackup
 
     private GraphDatabaseService startGraphDatabase( String path )
     {
-        return new EmbeddedGraphDatabase( path, stringMap(
-                Config.KEEP_LOGICAL_LOGS, "true" ) );
+        return new GraphDatabaseFactory().
+            newEmbeddedDatabaseBuilder( path ).
+            setConfig( GraphDatabaseSettings.keep_logical_logs, GraphDatabaseSetting.TRUE ).
+            newGraphDatabase();
     }
 
     private DbRepresentation createInitialDataSet( String path )
@@ -369,8 +373,9 @@ public class TestBackup
         GraphDatabaseService db = null;
         try
         {
-            db = new EmbeddedGraphDatabase( serverPath,
-                    stringMap( ENABLE_ONLINE_BACKUP, "true" ) );
+            db = new GraphDatabaseFactory().newEmbeddedDatabaseBuilder( serverPath ).
+                setConfig( OnlineBackupSettings.online_backup_enabled, GraphDatabaseSetting.TRUE ).
+                newGraphDatabase();
 
             Transaction tx = db.beginTx();
             Index<Node> index = db.index().forNodes( "yo" );
@@ -409,8 +414,9 @@ public class TestBackup
         GraphDatabaseService db = null;
         try
         {
-            db = new EmbeddedGraphDatabase( serverPath,
-                    stringMap( ENABLE_ONLINE_BACKUP, "true" ) );
+            db = new GraphDatabaseFactory().newEmbeddedDatabaseBuilder( serverPath ).
+                setConfig( OnlineBackupSettings.online_backup_enabled, GraphDatabaseSetting.TRUE ).
+                newGraphDatabase();
 
             db.index().forNodes( "created-no-commits" );
 
@@ -444,7 +450,10 @@ public class TestBackup
     {
         String key = "name";
         String value = "Neo";
-        GraphDatabaseService db = new EmbeddedGraphDatabase( serverPath, configForBackup() );
+        GraphDatabaseService db = new GraphDatabaseFactory().newEmbeddedDatabaseBuilder( serverPath ).
+            setConfig( OnlineBackupSettings.online_backup_enabled, GraphDatabaseSetting.TRUE ).
+            newGraphDatabase();
+
         Index<Node> index = db.index().forNodes( key );
         Transaction tx = db.beginTx();
         Node node = db.createNode();
@@ -472,7 +481,10 @@ public class TestBackup
     {
         String sourcePath = "target/var/serverdb-lock";
         FileUtils.deleteDirectory( new File( sourcePath ) );
-        GraphDatabaseService db = new EmbeddedGraphDatabase( sourcePath, stringMap( ENABLE_ONLINE_BACKUP, "true" ) );
+
+        GraphDatabaseService db = new GraphDatabaseFactory().newEmbeddedDatabaseBuilder( sourcePath ).
+            setConfig( OnlineBackupSettings.online_backup_enabled, GraphDatabaseSetting.TRUE ).
+            newGraphDatabase();
         try
         {
             assertStoreIsLocked( sourcePath );
@@ -483,11 +495,6 @@ public class TestBackup
         {
             db.shutdown();
         }
-    }
-
-    private Map<String, String> configForBackup()
-    {
-        return MapUtil.stringMap( Config.ENABLE_ONLINE_BACKUP, "true" );
     }
 
     private static void assertStoreIsLocked( String path )

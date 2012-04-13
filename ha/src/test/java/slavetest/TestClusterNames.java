@@ -17,25 +17,26 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package slavetest;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+package slavetest;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Transaction;
-import org.neo4j.helpers.collection.MapUtil;
+import org.neo4j.kernel.EnterpriseGraphDatabaseFactory;
 import org.neo4j.kernel.HaConfig;
 import org.neo4j.kernel.HighlyAvailableGraphDatabase;
+import org.neo4j.kernel.configuration.ConfigurationDefaults;
+import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.zookeeper.NeoStoreUtil;
 import org.neo4j.kernel.ha.zookeeper.ZooKeeperClusterClient;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.test.TargetDirectory;
 import org.neo4j.test.ha.LocalhostZooKeeperCluster;
+
+import static org.junit.Assert.*;
 
 public class TestClusterNames
 {
@@ -56,8 +57,8 @@ public class TestClusterNames
     @Test
     public void makeSureStoreIdInStoreMatchesZKData() throws Exception
     {
-        HighlyAvailableGraphDatabase db0 = db( 0, HaConfig.CONFIG_DEFAULT_HA_CLUSTER_NAME, HaConfig.CONFIG_DEFAULT_PORT );
-        HighlyAvailableGraphDatabase db1 = db( 1, HaConfig.CONFIG_DEFAULT_HA_CLUSTER_NAME, HaConfig.CONFIG_DEFAULT_PORT );
+        HighlyAvailableGraphDatabase db0 = db( 0, ConfigurationDefaults.getDefault( HaSettings.cluster_name, HaSettings.class ), HaConfig.CONFIG_DEFAULT_PORT );
+        HighlyAvailableGraphDatabase db1 = db( 1, ConfigurationDefaults.getDefault( HaSettings.cluster_name, HaSettings.class ), HaConfig.CONFIG_DEFAULT_PORT );
         awaitStarted( db0 );
         awaitStarted( db1 );
         db1.shutdown();
@@ -65,7 +66,7 @@ public class TestClusterNames
 
         ZooKeeperClusterClient cm = new ZooKeeperClusterClient( zoo.getConnectionString() );
         cm.waitForSyncConnected();
-        StoreId zkStoreId = StoreId.deserialize( cm.getZooKeeper( false ).getData( "/" + HaConfig.CONFIG_DEFAULT_HA_CLUSTER_NAME, false, null ) );
+        StoreId zkStoreId = StoreId.deserialize( cm.getZooKeeper( false ).getData( "/" + ConfigurationDefaults.getDefault( HaSettings.cluster_name, HaSettings.class ), false, null ) );
         StoreId storeId = new NeoStoreUtil( db0.getStoreDir() ).asStoreId();
         assertEquals( storeId, zkStoreId );
     }
@@ -77,14 +78,18 @@ public class TestClusterNames
         // Here's one cluster
         String cluster1Name = "cluster_1";
         HighlyAvailableGraphDatabase db0Cluster1 = db( 0, cluster1Name, HaConfig.CONFIG_DEFAULT_PORT );
+        System.out.println( "db0Cluster1:" + db0Cluster1 );
         HighlyAvailableGraphDatabase db1Cluster1 = db( 1, cluster1Name, HaConfig.CONFIG_DEFAULT_PORT );
+        System.out.println( "db1Cluster1:" + db1Cluster1 );
         awaitStarted( db0Cluster1 );
         awaitStarted( db1Cluster1 );
 
         // Here's another cluster
         String cluster2Name = "cluster.2";
         HighlyAvailableGraphDatabase db0Cluster2 = db( 0, cluster2Name, HaConfig.CONFIG_DEFAULT_PORT+1 );
+        System.out.println( "db0Cluster2:" + db0Cluster2 );
         HighlyAvailableGraphDatabase db1Cluster2 = db( 1, cluster2Name, HaConfig.CONFIG_DEFAULT_PORT+1 );
+        System.out.println( "db1Cluster2:" + db1Cluster2 );
         awaitStarted( db0Cluster2 );
         awaitStarted( db1Cluster2 );
 
@@ -109,6 +114,7 @@ public class TestClusterNames
         // Restart an instance and make sure it rejoins the correct cluster again
         db0Cluster1.shutdown();
         
+        System.out.println( "here should be a reuse" );
         pullUpdates( db1Cluster1 );
         setRefNodeName( db1Cluster1, cluster1PropertyName );
         assertTrue( db1Cluster1.isMaster() );
@@ -171,12 +177,14 @@ public class TestClusterNames
     private HighlyAvailableGraphDatabase db( int serverId, String clusterName, int serverPort )
     {
         TargetDirectory dir = TargetDirectory.forTest( getClass() );
-        return new HighlyAvailableGraphDatabase( dir.directory( clusterName + "-" + serverId, true ).getAbsolutePath(), MapUtil.stringMap(
-                HaConfig.CONFIG_KEY_SERVER_ID, String.valueOf( serverId ),
-                HaConfig.CONFIG_KEY_COORDINATORS, zoo.getConnectionString(),
-                HaConfig.CONFIG_KEY_CLUSTER_NAME, clusterName,
-                HaConfig.CONFIG_KEY_SERVER, "localhost:" + serverPort,
-                HaConfig.CONFIG_KEY_READ_TIMEOUT, String.valueOf( 2 ) ) );
+        return (HighlyAvailableGraphDatabase) new EnterpriseGraphDatabaseFactory().
+            newHighlyAvailableDatabaseBuilder( dir.directory( clusterName + "-" + serverId, true ).getAbsolutePath() ).
+            setConfig( HaSettings.server_id, String.valueOf( serverId ) ).
+            setConfig( HaSettings.coordinators, zoo.getConnectionString() ).
+            setConfig( HaSettings.cluster_name, clusterName ).
+            setConfig( HaSettings.server, "localhost:" + serverPort ).
+            setConfig( HaSettings.read_timeout, "5" ).
+            newGraphDatabase();
     }
 
     private void awaitStarted( GraphDatabaseService db )
