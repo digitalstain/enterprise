@@ -20,8 +20,13 @@
 
 package org.neo4j.backup;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.io.FilenameFilter;
+
 import org.apache.commons.io.FileUtils;
 import org.junit.Before;
 import org.junit.Test;
@@ -34,12 +39,6 @@ import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.graphdb.index.Index;
-<<<<<<< HEAD
-import org.neo4j.helpers.collection.MapUtil;
-import org.neo4j.kernel.Config;
-=======
-import org.neo4j.kernel.AbstractGraphDatabase;
->>>>>>> master
 import org.neo4j.kernel.EmbeddedGraphDatabase;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
@@ -47,8 +46,6 @@ import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.test.DbRepresentation;
 import org.neo4j.test.TargetDirectory;
 import org.neo4j.test.subprocess.SubProcess;
-
-import static org.junit.Assert.*;
 
 public class TestBackup
 {
