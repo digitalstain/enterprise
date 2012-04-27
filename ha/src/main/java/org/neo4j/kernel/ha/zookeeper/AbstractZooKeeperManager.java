@@ -26,7 +26,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.neo4j.com.Client.ConnectionLostHandler;
 import org.neo4j.com.ComException;
@@ -51,6 +53,7 @@ import org.neo4j.kernel.impl.util.StringLogger;
 public abstract class AbstractZooKeeperManager
 {
     protected static final String HA_SERVERS_CHILD = "ha-servers";
+    static final String ELECTION_REQUESTED_CHILD = "election-requested";
 
     private final String servers;
     private final Map<Integer, String> haServersCache = Collections.synchronizedMap(
@@ -267,6 +270,7 @@ public abstract class AbstractZooKeeperManager
         }
         try
         {
+            notifyFlushTxId();
             Map<Integer, ZooKeeperMachine> result = new HashMap<Integer, ZooKeeperMachine>();
             String root = getRoot();
             List<String> children = getZooKeeper( true ).getChildren( root, false );
@@ -282,11 +286,17 @@ public abstract class AbstractZooKeeperManager
                 {
                     int id = parsedChild.first();
                     int seq = parsedChild.other();
-                    Pair<Long, Integer> instanceData = readDataRepresentingInstance( root + "/" + child );
+                    long lastCommittedTxId = -1;
+                    int masterForLastTxId = -1;
+                    while (lastCommittedTxId == -1)
+                    {
+                        Pair<Long, Integer> instanceData = readDataRepresentingInstance( root + "/" + child );
+                        lastCommittedTxId = instanceData.first();
+                        masterForLastTxId = instanceData.other();
+                    }
                     if ( !result.containsKey( id ) || seq > result.get( id ).getSequenceId() )
                     {
-                        result.put( id, new ZooKeeperMachine( id, seq,
-                                instanceData.first(), instanceData.other(),
+                        result.put( id, new ZooKeeperMachine( id, seq, lastCommittedTxId, masterForLastTxId,
                                 getHaServer( id, wait ), HA_SERVERS_CHILD + "/"
                                                          + id ) );
                     }
@@ -309,6 +319,65 @@ public abstract class AbstractZooKeeperManager
         {
             Thread.interrupted();
             throw new ZooKeeperException( "Interrupted.", e );
+        }
+    }
+
+    protected void notifyFlushTxId()
+    {
+        try
+        {
+            String root = getRoot();
+            String path = root + "/" + ELECTION_REQUESTED_CHILD;
+            byte[] data = null;
+            boolean exists = false;
+            try
+            {
+                data = getZooKeeper( true ).getData( path, true, null );
+                exists = true;
+            }
+            catch ( KeeperException e )
+            {
+                if ( e.code() != KeeperException.Code.NONODE )
+                {
+                    throw new ZooKeeperException( "Couldn't get master notify node", e );
+                }
+                // otherwise it is just not there, so we create it below
+            }
+
+            try
+            {
+                if ( !exists )
+                {
+                    data = new byte[4];
+                    ByteBuffer.wrap( data ).putInt( 1 );;
+                    getZooKeeper( true ).create( path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT );
+                    msgLog.logMessage( ELECTION_REQUESTED_CHILD + " created for the first time" );
+                }
+                else
+                {
+                    ByteBuffer buffer = ByteBuffer.wrap( data );
+                    int currentValue = buffer.getInt();
+                    buffer.rewind();
+                    buffer.putInt( currentValue + 1 );
+                    getZooKeeper( true ).setData( path, data, -1 );
+                    msgLog.logMessage( ELECTION_REQUESTED_CHILD + " set to " + ( currentValue + 1 ) );
+                }
+
+                // Add a watch for it
+                getZooKeeper( true ).getData( path, true, null );
+            }
+            catch ( KeeperException e )
+            {
+                if ( e.code() != KeeperException.Code.NODEEXISTS )
+                {
+                    throw new ZooKeeperException( "Couldn't set master notify node", e );
+                }
+            }
+        }
+        catch ( InterruptedException e )
+        {
+            Thread.interrupted();
+            throw new ZooKeeperException( "Interrupted", e );
         }
     }
 

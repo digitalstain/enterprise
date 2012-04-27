@@ -459,6 +459,7 @@ public class ZooClient extends AbstractZooKeeperManager
             // Add watches to our master notification nodes
             subscribeToDataChangeWatcher( MASTER_NOTIFY_CHILD );
             subscribeToDataChangeWatcher( MASTER_REBOUND_CHILD );
+            subscribeToDataChangeWatcher( ELECTION_REQUESTED_CHILD );
             return created.substring( created.lastIndexOf( "_" ) + 1 );
         }
         catch ( KeeperException e )
@@ -628,13 +629,30 @@ public class ZooClient extends AbstractZooKeeperManager
 
     public synchronized void setCommittedTx( long tx )
     {
+        committedTx = tx;
+    }
+
+    private synchronized void resetCommittedTx()
+    {
+        long realCommittedTx = committedTx;
+        committedTx = -1;
+        flushCommittedTxToZooKeeper();
+        committedTx = realCommittedTx;
+    }
+
+    private synchronized void flushCommittedTxToZooKeeper()
+    {
+
         waitForSyncConnected();
-        this.committedTx = tx;
-        int master = localDatabase.getMasterForTx( tx );
-        this.masterForCommittedTx = master;
+        int master = -1;
+        if ( committedTx != -1 )
+        {
+            master = localDatabase.getMasterForTx( committedTx );
+            this.masterForCommittedTx = master;
+        }
         String root = getRoot();
         String path = root + "/" + machineId + "_" + sequenceNr;
-        byte[] data = dataRepresentingMe( tx, master );
+        byte[] data = dataRepresentingMe( committedTx, master );
         try
         {
             zooKeeper.setData( path, data, -1 );
@@ -759,7 +777,7 @@ public class ZooClient extends AbstractZooKeeperManager
             implements Watcher
     {
         private final Queue<WatchedEvent> unprocessedEvents = new LinkedList<WatchedEvent>();
-        
+
         /**
          * Flush all events we go before initialization of ZooKeeper/WatcherImpl was completed.
          * @param zooKeeper ZooKeeper instance to use when processing. We cannot rely on the
@@ -776,7 +794,7 @@ public class ZooClient extends AbstractZooKeeperManager
                     processEvent( e, zooKeeper );
             }
         }
-        
+
         public void process( WatchedEvent event )
         {
             /*
@@ -784,7 +802,7 @@ public class ZooClient extends AbstractZooKeeperManager
              * this watcher which uses the ZooKeeper object that it's set to watch. And
              * it is passed in to the constructor of the ZooKeeper object. So, if this watcher
              * gets an event before the ZooKeeper constructor returns we're screwed here.
-             * 
+             *
              * Cue unprocessedEvents queue. It will act as a shield for this design blunder
              * and absorb the events we get before everything is properly initialized,
              * and emit them right thereafter (see #flushUnprocessedEvents()).
@@ -797,7 +815,7 @@ public class ZooClient extends AbstractZooKeeperManager
                     return;
                 }
             }
-            
+
             processEvent( event, zooKeeper );
         }
 
@@ -871,7 +889,8 @@ public class ZooClient extends AbstractZooKeeperManager
                         // it really is master.
                         if ( newMasterMachineId == machineId )
                         {
-                            clusterReceiver.newMaster( new InformativeStackTrace( "NodeDataChanged event received (someone though I should be the master)" ) );
+                            clusterReceiver.newMaster( new InformativeStackTrace(
+                                    "NodeDataChanged event received (someone thought I should be the master)" ) );
                         }
                     }
                     else if ( path.contains( MASTER_REBOUND_CHILD ) )
@@ -883,6 +902,11 @@ public class ZooClient extends AbstractZooKeeperManager
                         {
                             clusterReceiver.newMaster( new InformativeStackTrace( "NodeDataChanged event received (new master ensures I'm slave)" ) );
                         }
+                        resetCommittedTx();
+                    }
+                    else if ( path.contains( ELECTION_REQUESTED_CHILD ) )
+                    {
+                        flushCommittedTxToZooKeeper();
                     }
                     else
                     {
