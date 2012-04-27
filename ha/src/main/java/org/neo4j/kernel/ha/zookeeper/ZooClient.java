@@ -36,7 +36,9 @@ import java.net.UnknownHostException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.Date;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 
 import javax.management.remote.JMXServiceURL;
 
@@ -53,6 +55,7 @@ import org.neo4j.helpers.Exceptions;
 import org.neo4j.helpers.Pair;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.HaConfig;
+import org.neo4j.kernel.InformativeStackTrace;
 import org.neo4j.kernel.SlaveUpdateMode;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha.ClusterEventReceiver;
@@ -73,7 +76,7 @@ public class ZooClient extends AbstractZooKeeperManager
     static final String MASTER_NOTIFY_CHILD = "master-notify";
     static final String MASTER_REBOUND_CHILD = "master-rebound";
 
-    private ZooKeeper zooKeeper;
+    private final ZooKeeper zooKeeper;
     private final int machineId;
     private String sequenceNr;
 
@@ -122,7 +125,16 @@ public class ZooClient extends AbstractZooKeeperManager
 
         try
         {
-            zooKeeper = new ZooKeeper( getServers(), getSessionTimeout(), new WatcherImpl() );
+            /*
+             * Chicken and egg problem of sorts. The WatcherImpl might need zooKeeper instance
+             * before its constructor has returned, hence the "flushUnprocessedEvents" workaround.
+             * Without it the watcher might throw NPE on the initial (maybe SyncConnected) events,
+             * which would effectively prevent a client from feeling connected to its ZK cluster.
+             * See WatcherImpl for more detail on this.
+             */
+            WatcherImpl watcher = new WatcherImpl();
+            zooKeeper = new ZooKeeper( getServers(), getSessionTimeout(), watcher );
+            watcher.flushUnprocessedEvents( zooKeeper );
         }
         catch ( IOException e )
         {
@@ -360,7 +372,7 @@ public class ZooClient extends AbstractZooKeeperManager
                 throw new ZooKeeperException( "Got interrupted", e );
             }
         } while ( rootData == null );
-        throw new IllegalStateException();
+        throw new IllegalStateException( "Root path couldn't be found" );
     }
 
     private void makeSureRootPathIsFound()
@@ -502,8 +514,10 @@ public class ZooClient extends AbstractZooKeeperManager
             }
             catch ( KeeperException ee )
             {
-                ee.printStackTrace();
-                // ok
+                if ( ee.code() != KeeperException.Code.NONODE )
+                {
+                    msgLog.logMessage( "Unable to delete " + machinePath, ee );
+                }
             }
             finally
             {
@@ -744,7 +758,50 @@ public class ZooClient extends AbstractZooKeeperManager
     private class WatcherImpl
             implements Watcher
     {
+        private final Queue<WatchedEvent> unprocessedEvents = new LinkedList<WatchedEvent>();
+        
+        /**
+         * Flush all events we go before initialization of ZooKeeper/WatcherImpl was completed.
+         * @param zooKeeper ZooKeeper instance to use when processing. We cannot rely on the
+         * zooKeeper instance inherited from ZooClient since the contract says that such fields
+         * are only guaranteed to be published when the constructor has returned, and at this
+         * point it hasn't.
+         */
+        protected void flushUnprocessedEvents( ZooKeeper zooKeeper )
+        {
+            synchronized ( unprocessedEvents )
+            {
+                WatchedEvent e = null;
+                while ( (e = unprocessedEvents.poll()) != null )
+                    processEvent( e, zooKeeper );
+            }
+        }
+        
         public void process( WatchedEvent event )
+        {
+            /*
+             * MP: The setup we have here is messed up. Why do I say that? Well, we've got
+             * this watcher which uses the ZooKeeper object that it's set to watch. And
+             * it is passed in to the constructor of the ZooKeeper object. So, if this watcher
+             * gets an event before the ZooKeeper constructor returns we're screwed here.
+             * 
+             * Cue unprocessedEvents queue. It will act as a shield for this design blunder
+             * and absorb the events we get before everything is properly initialized,
+             * and emit them right thereafter (see #flushUnprocessedEvents()).
+             */
+            synchronized ( unprocessedEvents )
+            {
+                if ( zooKeeper == null || !unprocessedEvents.isEmpty() )
+                {
+                    unprocessedEvents.add( event );
+                    return;
+                }
+            }
+            
+            processEvent( event, zooKeeper );
+        }
+
+        private void processEvent( WatchedEvent event, ZooKeeper zooKeeper )
         {
             try
             {
@@ -753,7 +810,7 @@ public class ZooClient extends AbstractZooKeeperManager
                 if ( path == null && event.getState() == Watcher.Event.KeeperState.Expired )
                 {
                     keeperState = KeeperState.Expired;
-                    clusterReceiver.reconnect( new Exception() );
+                    clusterReceiver.reconnect( new InformativeStackTrace( "Reconnect due to session expired" ) );
                 }
                 else if ( path == null && event.getState() == Watcher.Event.KeeperState.SyncConnected )
                 {
@@ -771,7 +828,7 @@ public class ZooClient extends AbstractZooKeeperManager
                             msgLog.logMessage( "Get master after write:" + masterAfterIWrote );
                             if ( sessionId != -1 )
                             {
-                                clusterReceiver.newMaster( new Exception( "Got SyncConnected event from ZK" ) );
+                                clusterReceiver.newMaster( new InformativeStackTrace( "Got SyncConnected event from ZK" ) );
                             }
                             sessionId = newSessionId;
                         }
@@ -800,7 +857,7 @@ public class ZooClient extends AbstractZooKeeperManager
                     if ( path.contains( currentMaster.getZooKeeperPath() ) )
                     {
                         msgLog.logMessage("Acting on it, calling newMaster()");
-                        clusterReceiver.newMaster( new Exception() );
+                        clusterReceiver.newMaster( new InformativeStackTrace( "NodeDeleted event received (a machine left the cluster)" ) );
                     }
                 }
                 else if ( event.getType() == Watcher.Event.EventType.NodeDataChanged )
@@ -814,7 +871,7 @@ public class ZooClient extends AbstractZooKeeperManager
                         // it really is master.
                         if ( newMasterMachineId == machineId )
                         {
-                            clusterReceiver.newMaster( new Exception() );
+                            clusterReceiver.newMaster( new InformativeStackTrace( "NodeDataChanged event received (someone though I should be the master)" ) );
                         }
                     }
                     else if ( path.contains( MASTER_REBOUND_CHILD ) )
@@ -824,7 +881,7 @@ public class ZooClient extends AbstractZooKeeperManager
                         // become slaves if they don't already are.
                         if ( newMasterMachineId != machineId )
                         {
-                            clusterReceiver.newMaster( new Exception() );
+                            clusterReceiver.newMaster( new InformativeStackTrace( "NodeDataChanged event received (new master ensures I'm slave)" ) );
                         }
                     }
                     else
@@ -833,15 +890,18 @@ public class ZooClient extends AbstractZooKeeperManager
                     }
                 }
             }
+            catch ( BrokerShutDownException e )
+            {
+                // It's OK. We're in a state where we cannot accept incoming events.
+            }
             catch ( Exception e )
             {
                 msgLog.logMessage( "Error in ZooClient.process", e, true );
-                e.printStackTrace();
                 throw Exceptions.launderedException( e );
             }
-                finally
+            finally
             {
-                    msgLog.flush();
+                msgLog.flush();
             }
         }
     }

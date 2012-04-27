@@ -20,16 +20,31 @@
 
 package slavetest;
 
+import static java.util.Arrays.asList;
+import static java.util.concurrent.Executors.newFixedThreadPool;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.neo4j.helpers.collection.MapUtil.stringMap;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.rmi.RemoteException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -37,10 +52,12 @@ import org.neo4j.com.Client;
 import org.neo4j.com.Client.ConnectionLostHandler;
 import org.neo4j.com.ComException;
 import org.neo4j.com.Protocol;
+import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.NotFoundException;
 import org.neo4j.graphdb.Relationship;
+import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.TransactionFailureException;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
@@ -59,16 +76,12 @@ import org.neo4j.kernel.ha.MasterClient;
 import org.neo4j.kernel.ha.MasterImpl;
 import org.neo4j.kernel.ha.zookeeper.AbstractZooKeeperManager;
 import org.neo4j.kernel.ha.zookeeper.Machine;
+import org.neo4j.kernel.impl.core.RelationshipTypeHolder;
 import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.transaction.LockType;
 import org.neo4j.kernel.impl.transaction.TxManager;
 import org.neo4j.kernel.impl.util.FileUtils;
 import org.neo4j.kernel.impl.util.StringLogger;
-
-import static java.util.Arrays.*;
-import static java.util.concurrent.Executors.*;
-import static org.junit.Assert.*;
-import static org.neo4j.helpers.collection.MapUtil.*;
 
 public class SingleJvmWithNettyTest extends SingleJvmTest
 {
@@ -88,7 +101,7 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
                 "Slave Broker is not a client",
                 ( (HighlyAvailableGraphDatabase) getSlave( 0 ) ).getBroker().getMaster().first() instanceof MasterClient );
     }
-
+    
     @Override
     protected Broker makeSlaveBroker( TestMaster master, int masterId, int id, HighlyAvailableGraphDatabase db, Map<String, String> config )
     {
@@ -141,7 +154,7 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
         String value = config.get( key );
         return value != null ? Integer.parseInt( value ) : defaultValue;
     }
-
+    
     @Test
     public void makeSureLogMessagesIsWrittenEvenAfterInternalRestart() throws Exception
     {
@@ -245,11 +258,6 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
         {
             tx.finish();
         }
-    }
-
-    private HighlyAvailableGraphDatabase getMasterHaDb()
-    {
-        return (HighlyAvailableGraphDatabase) getMaster().getGraphDb();
     }
 
     @Test
@@ -377,10 +385,9 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
         long slaveNodeId = slave.createNode().getId();
 
         // Restart the master
-        getMasterHaDb().shutdown();
+        shutdownMaster();
         HighlyAvailableGraphDatabase newMaster = startUpMasterDb( MapUtil.stringMap() );
         getMaster().setGraphDb( newMaster );
-        
 
         // Try to commit the tx from the slave and make sure it cannot do that
         slaveTx.success();
@@ -562,7 +569,7 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
         } );
         
         DoubleLatch latch = latchFetcher.fetch();
-        latch.countDownFirst();
+        latch.awaitFirst(); // Wait for lockHolder to grab the lock
         try
         {
             executeJob( new CommonJobs.SetNodePropertyWithThrowJob( otherNodeId.longValue(),
@@ -701,6 +708,96 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
         {
             fail( "Should not have gotten more than one failed pullUpdates during master switch." );
         }
+    }
+    
+    @Test
+    public void bruteForceCreateSameRelationshipTypeOnDifferentSlaveAtTheSameTimeShouldYieldSameId() throws Exception
+    {
+        int slaves = 3;
+        initializeDbs( slaves );
+
+        for ( int i = 0; i < 10; i++ )
+        {
+            final RelationshipType relType = DynamicRelationshipType.withName( "Rel" + i );
+            final CountDownLatch latch = new CountDownLatch( 1 );
+            List<Thread> threads = new ArrayList<Thread>();
+            for ( int s = 0; s < slaves; s++ )
+            {
+                final GraphDatabaseAPI db = getSlave( s );
+                Thread thread = new Thread()
+                {
+                    @Override
+                    public void run()
+                    {
+                        try
+                        {
+                            latch.await();
+                        }
+                        catch ( InterruptedException e )
+                        {
+                            throw new RuntimeException( e );
+                        }
+                        
+                        Transaction tx = db.beginTx();
+                        try
+                        {
+                            db.createNode().createRelationshipTo( db.createNode(), relType );
+                            tx.success();
+                        }
+                        finally
+                        {
+                            tx.finish();
+                        }
+                    }
+                };
+                thread.start();
+                threads.add( thread );
+            }
+            
+            latch.countDown();
+            for ( Thread thread : threads )
+            {
+                thread.join();
+            }
+            
+            List<GraphDatabaseAPI> dbs = new ArrayList<GraphDatabaseAPI>();
+            dbs.add( getMasterHaDb() );
+            for ( int s = 0; s < slaves; s++ )
+                dbs.add( getSlave( s ) );
+            
+            // Verify so that the relationship type on all the machines has got the same id
+            int highestId = 0;
+            for ( GraphDatabaseAPI db : dbs )
+            {
+                RelationshipTypeHolder holder = db.getNodeManager().getRelationshipTypeHolder();
+                highestId = highestIdOf( holder, highestId );
+                Set<String> types = new HashSet<String>();
+                for ( int j = 0; j <= highestId; j++ )
+                {
+                    RelationshipType type = holder.getRelationshipType( j );
+                    if ( type != null )
+                    {
+                        assertTrue( type.name() + " already existed for " + db, types.add( type.name() ) );
+                    }
+                }
+            }
+        }
+        pullUpdates();
+    }
+
+    private int highestIdOf( RelationshipTypeHolder holder, int high )
+    {
+        for ( RelationshipType type : holder.getRelationshipTypes() )
+        {
+            high = Math.max( holder.getIdFor( type.name() ), high );
+        }
+        return high;
+    }
+
+    private RelationshipType getRelationshipType( GraphDatabaseAPI db, String name )
+    {
+        int id = db.getNodeManager().getRelationshipTypeHolder().getIdFor( name );
+        return db.getNodeManager().getRelationshipTypeHolder().getRelationshipType( id );
     }
 
     private Pair<Integer, Integer> getTransactionCounts( GraphDatabaseAPI master )

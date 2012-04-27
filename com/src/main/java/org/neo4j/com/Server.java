@@ -77,7 +77,7 @@ public abstract class Server<M, R> extends Protocol implements ChannelPipelineFa
 
     private final ChannelFactory channelFactory;
     private final ServerBootstrap bootstrap;
-    private final M realMaster;
+    private M realMaster;
     private final ChannelGroup channelGroup;
     private final Map<Channel, Pair<SlaveContext, AtomicLong /*time last heard of*/>> connectedSlaveChannels =
             new HashMap<Channel, Pair<SlaveContext,AtomicLong>>();
@@ -100,7 +100,7 @@ public abstract class Server<M, R> extends Protocol implements ChannelPipelineFa
 
     private final byte applicationProtocolVersion;
     private final int oldChannelThresholdMillis;
-    private final TxChecksumVerifier txVerifier;
+    private TxChecksumVerifier txVerifier;
     
     public Server( M realMaster, final int port, StringLogger logger, int frameLength, byte applicationProtocolVersion,
             int maxNumberOfConcurrentTransactions, int oldChannelThreshold/*seconds*/, TxChecksumVerifier txVerifier )
@@ -561,6 +561,12 @@ public abstract class Server<M, R> extends Protocol implements ChannelPipelineFa
         channelGroup.close().awaitUninterruptibly();
         executor.shutdown();
         msgLog.logMessage( getClass().getSimpleName() + " shutdown", true );
+        
+        // Set this to null since bootstrap/channelFactory.releaseExternalResources
+        // cannot be called and holds a reference to this Server instance.
+        realMaster = null;
+        txVerifier = null;
+        
         // TODO This should work, but blocks with busy wait sometimes
 //        channelFactory.releaseExternalResources();
     }
