@@ -5,34 +5,20 @@
  * This file is part of Neo4j.
  *
  * Neo4j is free software: you can redistribute it and/or modify
-<<<<<<< HEAD
  * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
-=======
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
->>>>>>> Updated Bootstrapper, added EnterpriseNeoServer and EnterpriseDatabase to conform to changes in community
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-<<<<<<< HEAD
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
-=======
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>>>>>> Updated Bootstrapper, added EnterpriseNeoServer and EnterpriseDatabase to conform to changes in community
  */
 package org.neo4j.server.enterprise;
 
-import org.neo4j.server.advanced.AdvancedNeoServer;
 import org.neo4j.server.configuration.Configurator;
 import org.neo4j.server.database.Database;
 import org.neo4j.server.startup.healthcheck.StartupHealthCheck;
