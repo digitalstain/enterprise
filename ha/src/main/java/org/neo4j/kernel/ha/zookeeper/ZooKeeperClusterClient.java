@@ -20,10 +20,13 @@
 
 package org.neo4j.kernel.ha.zookeeper;
 
+import static org.neo4j.com.Server.DEFAULT_BACKUP_PORT;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
+
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
@@ -36,8 +39,6 @@ import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.Master;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.util.StringLogger;
-
-import static org.neo4j.com.Server.*;
 
 public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements ClusterClient
 {
@@ -158,12 +159,6 @@ public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements 
             throw new RuntimeException( "Cluster '" + clusterName + "' not found" );
         }
         return asRootPath( storeId );
-    }
-
-    @Override
-    protected int getMyMachineId()
-    {
-        throw new UnsupportedOperationException();
     }
 
     /**

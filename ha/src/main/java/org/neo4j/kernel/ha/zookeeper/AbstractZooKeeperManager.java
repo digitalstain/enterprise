@@ -26,7 +26,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.neo4j.com.Client.ConnectionLostHandler;
 import org.neo4j.com.ComException;
@@ -51,6 +53,7 @@ import org.neo4j.kernel.impl.util.StringLogger;
 public abstract class AbstractZooKeeperManager
 {
     protected static final String HA_SERVERS_CHILD = "ha-servers";
+    protected static final String FLUSH_REQUESTED_CHILD = "flush-requested";
 
     private final String servers;
     private final Map<Integer, String> haServersCache = Collections.synchronizedMap(
@@ -199,7 +202,10 @@ public abstract class AbstractZooKeeperManager
                 clientLockReadTimeout, maxConcurrentChannelsPerSlave );
     }
 
-    protected abstract int getMyMachineId();
+    protected int getMyMachineId()
+    {
+        return -1;
+    }
 
     public Pair<Master, Machine> getCachedMaster()
     {
@@ -267,6 +273,7 @@ public abstract class AbstractZooKeeperManager
         }
         try
         {
+            writeFlush( getMyMachineId() );
             Map<Integer, ZooKeeperMachine> result = new HashMap<Integer, ZooKeeperMachine>();
             String root = getRoot();
             List<String> children = getZooKeeper( true ).getChildren( root, false );
@@ -283,12 +290,22 @@ public abstract class AbstractZooKeeperManager
                     int id = parsedChild.first();
                     int seq = parsedChild.other();
                     Pair<Long, Integer> instanceData = readDataRepresentingInstance( root + "/" + child );
+                    long lastCommittedTxId = instanceData.first();
+                    int masterForTheAbove = instanceData.other();
+                    while ( lastCommittedTxId == -2 )
+                    {
+                        System.out.println( getMyMachineId() + ": couldn't read " + id + "_" + seq + ", retrying" );
+                        writeFlush( getMyMachineId() );
+                        instanceData = readDataRepresentingInstance( root + "/" + child );
+                        lastCommittedTxId = instanceData.first();
+                        masterForTheAbove = instanceData.other();
+                    }
                     if ( !result.containsKey( id ) || seq > result.get( id ).getSequenceId() )
                     {
-                        result.put( id, new ZooKeeperMachine( id, seq,
-                                instanceData.first(), instanceData.other(),
-                                getHaServer( id, wait ), HA_SERVERS_CHILD + "/"
-                                                         + id ) );
+                        ZooKeeperMachine toAdd = new ZooKeeperMachine( id, seq, lastCommittedTxId, masterForTheAbove,
+                                getHaServer( id, wait ), HA_SERVERS_CHILD + "/" + id );
+                        System.out.println( getMyMachineId() + ": Adding " + toAdd );
+                        result.put( id, toAdd );
                     }
                 }
                 catch ( KeeperException inner )
@@ -296,6 +313,10 @@ public abstract class AbstractZooKeeperManager
                     if ( inner.code() != KeeperException.Code.NONODE )
                     {
                         throw new ZooKeeperException( "Unable to get master.", inner );
+                    }
+                    else
+                    {
+                        System.out.println( "Dude, " + child + " is sooooo gone" );
                     }
                 }
             }
@@ -310,7 +331,22 @@ public abstract class AbstractZooKeeperManager
             Thread.interrupted();
             throw new ZooKeeperException( "Interrupted.", e );
         }
+        finally
+        {
+            writeFlush( foo-- );
+            try
+            {
+                Thread.sleep( 1000 );
+            }
+            catch ( InterruptedException e )
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
     }
+
+    private volatile int foo = -6;
 
     protected String getHaServer( int machineId, boolean wait )
     {
@@ -456,6 +492,39 @@ public abstract class AbstractZooKeeperManager
     public String getServers()
     {
         return servers;
+    }
+
+    private void writeFlush( int toWrite )
+    {
+        final String path = getRoot() + "/" + FLUSH_REQUESTED_CHILD;
+        byte[] data = new byte[4];
+        ByteBuffer buffer = ByteBuffer.wrap( data );
+        buffer.putInt( toWrite );
+        try
+        {
+            if ( getZooKeeper( true ).exists( path, false ) == null )
+            {
+                System.out.println( "Not there, creating: " + toWrite );
+                getZooKeeper( true ).create( path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT );
+            }
+            else
+            {
+                System.out.println( "Existing, writing " + toWrite );
+                getZooKeeper( true ).setData( path, data, -1 );
+            }
+            getZooKeeper( true ).getData( path, true, null );
+            System.out.println( "Done" );
+        }
+        catch ( KeeperException e )
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        catch ( InterruptedException e )
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     protected static final Master NO_MASTER = new Master()
