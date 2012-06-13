@@ -39,6 +39,10 @@ import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.management.remote.JMXServiceURL;
 
@@ -101,6 +105,7 @@ public class ZooClient extends AbstractZooKeeperManager
     private final boolean writeLastCommittedTx;
     private final String clusterName;
     private final boolean allowCreateCluster;
+    private final WatcherImpl watcher;
 
     public ZooClient( String storeDir, StringLogger stringLogger, StoreIdGetter storeIdGetter, Config conf,
             SlaveDatabaseOperations localDatabase, ClusterEventReceiver clusterReceiver )
@@ -132,7 +137,7 @@ public class ZooClient extends AbstractZooKeeperManager
              * which would effectively prevent a client from feeling connected to its ZK cluster.
              * See WatcherImpl for more detail on this.
              */
-            WatcherImpl watcher = new WatcherImpl();
+            watcher = new WatcherImpl();
             zooKeeper = new ZooKeeper( getServers(), getSessionTimeout(), watcher );
             watcher.flushUnprocessedEvents( zooKeeper );
         }
@@ -627,11 +632,11 @@ public class ZooClient extends AbstractZooKeeperManager
         connection.setJMXConnectionData( new String( url ), new String( instanceId ) );
     }
 
-    private volatile boolean flushing = false;
+    private boolean flushing = false;
 
     private synchronized void startFlushing()
     {
-        System.out.println( getMyMachineId() + ": entering flushing state" );
+        // System.out.println( getMyMachineId() + ": entering flushing state" );
         final long txNow = committedTx;
         if ( !flushing )
         {
@@ -642,7 +647,7 @@ public class ZooClient extends AbstractZooKeeperManager
 
     private synchronized void stopFlushing()
     {
-        System.out.println( getMyMachineId() + ": leaving flushing state" );
+        // System.out.println( getMyMachineId() + ": leaving flushing state" );
         if ( flushing )
         {
             writeData( -2, -2 );
@@ -653,11 +658,7 @@ public class ZooClient extends AbstractZooKeeperManager
     public synchronized void setCommittedTx( long tx )
     {
         this.committedTx = tx;
-        if ( !flushing )
-        {
-            System.out.println( getMyMachineId() + ": I won't write " + tx );
-        }
-        else
+        if ( flushing )
         {
             masterForCommittedTx = localDatabase.getMasterForTx( tx );
             writeData( tx, masterForCommittedTx );
@@ -672,9 +673,11 @@ public class ZooClient extends AbstractZooKeeperManager
         byte[] data = dataRepresentingMe( tx, masterForThat );
         try
         {
-            System.out.println( "Trying to write to" + path + " " + tx + ", " + masterForThat );
+            // System.out.println( "Trying to write to" + path + " " + tx + ", "
+            // + masterForThat );
             zooKeeper.setData( path, data, -1 );
-            System.out.println( "Wrote to" + path + " " + tx + ", " + masterForThat );
+            // System.out.println( "Wrote to" + path + " " + tx + ", " +
+            // masterForThat );
         }
         catch ( KeeperException e )
         {
@@ -684,10 +687,6 @@ public class ZooClient extends AbstractZooKeeperManager
         {
             Thread.interrupted();
             throw new ZooKeeperException( "Interrupted...", e );
-        }
-        catch ( Throwable t )
-        {
-            t.printStackTrace();
         }
     }
 
@@ -723,6 +722,7 @@ public class ZooClient extends AbstractZooKeeperManager
     public void shutdown()
     {
         System.out.println( getMyMachineId() + ": closing zoo client" );
+        // watcher.shutdown();
         msgLog.close();
         this.shutdown = true;
         super.shutdown();
@@ -801,13 +801,20 @@ public class ZooClient extends AbstractZooKeeperManager
             implements Watcher
     {
         private final Queue<WatchedEvent> unprocessedEvents = new LinkedList<WatchedEvent>();
+        private final ExecutorService threadPool = Executors.newFixedThreadPool( 10 );
+        private final AtomicInteger count = new AtomicInteger( 0 );
 
         /**
-         * Flush all events we go before initialization of ZooKeeper/WatcherImpl was completed.
-         * @param zooKeeper ZooKeeper instance to use when processing. We cannot rely on the
-         * zooKeeper instance inherited from ZooClient since the contract says that such fields
-         * are only guaranteed to be published when the constructor has returned, and at this
-         * point it hasn't.
+         * Flush all events we got before initialization of
+         * ZooKeeper/WatcherImpl was completed.
+         *
+         * @param zooKeeper ZooKeeper instance to use when processing. We cannot
+         *            rely on the
+         *            zooKeeper instance inherited from ZooClient since the
+         *            contract says that such fields
+         *            are only guaranteed to be published when the constructor
+         *            has returned, and at this
+         *            point it hasn't.
          */
         protected void flushUnprocessedEvents( ZooKeeper zooKeeper )
         {
@@ -815,7 +822,21 @@ public class ZooClient extends AbstractZooKeeperManager
             {
                 WatchedEvent e = null;
                 while ( (e = unprocessedEvents.poll()) != null )
-                    processEvent( e, zooKeeper );
+                    runEventInThread( e, zooKeeper );
+            }
+        }
+
+        public void shutdown()
+        {
+            flushUnprocessedEvents( zooKeeper );
+            threadPool.shutdown();
+            try
+            {
+                threadPool.awaitTermination( 10, TimeUnit.SECONDS );
+            }
+            catch ( InterruptedException e )
+            {
+                msgLog.logMessage( ZooClient.this + " couldn't flush pending events in time during shutdown", true );
             }
         }
 
@@ -839,21 +860,27 @@ public class ZooClient extends AbstractZooKeeperManager
                     return;
                 }
             }
+            runEventInThread( event, zooKeeper );
+        }
 
-            new Thread( new Runnable()
+        private synchronized void runEventInThread( final WatchedEvent event, final ZooKeeper zoo )
+        {
+            System.out.println( "Adding another thread with count " + count.get() );
+            threadPool.submit( new Runnable()
             {
                 @Override
                 public void run()
                 {
-                    processEvent( event, zooKeeper );
+                    processEvent( event, zoo );
                 }
-            } ).start();
+            } );
         }
 
         private void processEvent( WatchedEvent event, ZooKeeper zooKeeper )
         {
             try
             {
+                count.incrementAndGet();
                 String path = event.getPath();
                 msgLog.logMessage( this + ", " + new Date() + " Got event: " + event + " (path=" + path + ")", true );
                 System.out.println( getMyMachineId() + ": " + " Got event: " + event + " (path=" + path + ")" );
@@ -874,8 +901,10 @@ public class ZooClient extends AbstractZooKeeperManager
                         {
                             sequenceNr = setup();
                             msgLog.logMessage( "Did setup, seq=" + sequenceNr + " new sessionId=" + newSessionId );
-                            Pair<Master, Machine> masterAfterIWrote = getMasterFromZooKeeper( false, false );
-                            msgLog.logMessage( "Get master after write:" + masterAfterIWrote );
+                            // Pair<Master, Machine> masterAfterIWrote =
+                            // getMasterFromZooKeeper( false, false );
+                            // msgLog.logMessage( "Get master after write:" +
+                            // masterAfterIWrote );
                             if ( sessionId != -1 )
                             {
                                 clusterReceiver.newMaster( new InformativeStackTrace( "Got SyncConnected event from ZK" ) );
@@ -966,6 +995,7 @@ public class ZooClient extends AbstractZooKeeperManager
             finally
             {
                 msgLog.flush();
+                count.decrementAndGet();
             }
         }
     }

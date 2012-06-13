@@ -184,8 +184,7 @@ public abstract class AbstractZooKeeperManager
                 // If there is a master and it is not me
                 masterClient = getMasterClientToMachine( master );
             }
-            cachedMaster = Pair.<Master, Machine>of( masterClient,
-                    (Machine) master );
+            cachedMaster = Pair.<Master, Machine>of( masterClient, (Machine) master );
         }
         return cachedMaster;
     }
@@ -333,20 +332,9 @@ public abstract class AbstractZooKeeperManager
         }
         finally
         {
-            writeFlush( foo-- );
-            try
-            {
-                Thread.sleep( 1000 );
-            }
-            catch ( InterruptedException e )
-            {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
+            writeFlush( -6 );
         }
     }
-
-    private volatile int foo = -6;
 
     protected String getHaServer( int machineId, boolean wait )
     {
