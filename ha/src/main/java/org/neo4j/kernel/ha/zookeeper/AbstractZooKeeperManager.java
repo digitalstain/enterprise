@@ -55,6 +55,8 @@ public abstract class AbstractZooKeeperManager
     protected static final String HA_SERVERS_CHILD = "ha-servers";
     protected static final String FLUSH_REQUESTED_CHILD = "flush-requested";
 
+    protected static final int STOP_FLUSHING = -6;
+
     private final String servers;
     private final Map<Integer, String> haServersCache = Collections.synchronizedMap(
             new HashMap<Integer, String>() );
@@ -85,6 +87,11 @@ public abstract class AbstractZooKeeperManager
     protected String asRootPath( StoreId storeId )
     {
         return "/" + storeId.getCreationTime() + "_" + storeId.getRandomId();
+    }
+
+    protected String getSequenceNr()
+    {
+        return "-1";
     }
 
     protected StoreId getClusterStoreId( ZooKeeper keeper, String clusterName )
@@ -264,7 +271,18 @@ public abstract class AbstractZooKeeperManager
         return getAllMachines( wait, WaitMode.SESSION );
     }
 
+
     protected Map<Integer, ZooKeeperMachine> getAllMachines( boolean wait, WaitMode mode )
+    {
+        Map<Integer, ZooKeeperMachine> result = null;
+        while (result == null)
+        {
+            result = getAllMachinesInner( wait, mode );
+        }
+        return result;
+    }
+
+    protected Map<Integer, ZooKeeperMachine> getAllMachinesInner( boolean wait, WaitMode mode )
     {
         if ( wait )
         {
@@ -272,7 +290,18 @@ public abstract class AbstractZooKeeperManager
         }
         try
         {
+            int sequenceNumber = -1;
+            try
+            {
+                sequenceNumber = Integer.parseInt( getSequenceNr() );
+            }
+            catch ( NumberFormatException e )
+            {
+                // ok
+            }
+
             writeFlush( getMyMachineId() );
+            Thread.sleep( 100 );
             Map<Integer, ZooKeeperMachine> result = new HashMap<Integer, ZooKeeperMachine>();
             String root = getRoot();
             List<String> children = getZooKeeper( true ).getChildren( root, false );
@@ -291,13 +320,19 @@ public abstract class AbstractZooKeeperManager
                     Pair<Long, Integer> instanceData = readDataRepresentingInstance( root + "/" + child );
                     long lastCommittedTxId = instanceData.first();
                     int masterForTheAbove = instanceData.other();
-                    while ( lastCommittedTxId == -2 )
+                    if ( id == getMyMachineId() )
+                    {
+                        System.out.println( getMyMachineId() + ": trying to read my entry with sequence number " + seq
+                                            + "(mine now is " + sequenceNumber + ")" );
+                        if ( sequenceNumber == -1 )
+                        {
+                            continue;
+                        }
+                    }
+                    if ( lastCommittedTxId == -2 )
                     {
                         System.out.println( getMyMachineId() + ": couldn't read " + id + "_" + seq + ", retrying" );
-                        writeFlush( getMyMachineId() );
-                        instanceData = readDataRepresentingInstance( root + "/" + child );
-                        lastCommittedTxId = instanceData.first();
-                        masterForTheAbove = instanceData.other();
+                        return null;
                     }
                     if ( !result.containsKey( id ) || seq > result.get( id ).getSequenceId() )
                     {
@@ -332,7 +367,7 @@ public abstract class AbstractZooKeeperManager
         }
         finally
         {
-            writeFlush( -6 );
+            writeFlush( STOP_FLUSHING );
         }
     }
 
@@ -492,16 +527,34 @@ public abstract class AbstractZooKeeperManager
         {
             if ( getZooKeeper( true ).exists( path, false ) == null )
             {
-                System.out.println( "Not there, creating: " + toWrite );
                 getZooKeeper( true ).create( path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT );
             }
             else
             {
-                System.out.println( "Existing, writing " + toWrite );
-                getZooKeeper( true ).setData( path, data, -1 );
+                int current = ByteBuffer.wrap( getZooKeeper( true ).getData( path, false, null ) ).getInt();
+                if ( current != STOP_FLUSHING && toWrite == STOP_FLUSHING && current != getMyMachineId() )
+                {
+                    /*
+                     *  Someone changed it from what we wrote, we can't just not reset, because that machine
+                     *  may be down for the count. Instead wait a bit to finish, then reset, so we don't fall
+                     *  into a livelock.
+                     */
+                    System.out.println( getMyMachineId() + ": Will reset but waiting for " + current
+                                        + "to finish its thing" );
+                    Thread.sleep( 300 );
+                }
+                if ( current != toWrite )
+                {
+                    System.out.println( getMyMachineId() + ": writing " + toWrite );
+                    getZooKeeper( true ).setData( path, data, -1 );
+                }
+                else
+                {
+                    System.out.println( getMyMachineId() + ": didn't write " + toWrite );
+                }
             }
+            // Set the watch
             getZooKeeper( true ).getData( path, true, null );
-            System.out.println( "Done" );
         }
         catch ( KeeperException e )
         {

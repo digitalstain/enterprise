@@ -65,7 +65,6 @@ import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha.ClusterEventReceiver;
 import org.neo4j.kernel.ha.ConnectionInformation;
 import org.neo4j.kernel.ha.HaSettings;
-import org.neo4j.kernel.ha.Master;
 import org.neo4j.kernel.ha.MasterImpl;
 import org.neo4j.kernel.ha.MasterServer;
 import org.neo4j.kernel.ha.SlaveDatabaseOperations;
@@ -632,26 +631,30 @@ public class ZooClient extends AbstractZooKeeperManager
         connection.setJMXConnectionData( new String( url ), new String( instanceId ) );
     }
 
-    private boolean flushing = false;
+    private volatile boolean flushing = false;
 
-    private synchronized void startFlushing()
+    private void startFlushing()
     {
-        // System.out.println( getMyMachineId() + ": entering flushing state" );
-        final long txNow = committedTx;
         if ( !flushing )
         {
-            writeData( txNow, getFirstMasterForTx( txNow ) );
-            flushing = true;
+            synchronized ( this )
+            {
+                long txNow = committedTx;
+                flushing = true;
+                writeData( txNow, getFirstMasterForTx( txNow ) );
+            }
         }
     }
 
-    private synchronized void stopFlushing()
+    private void stopFlushing()
     {
-        // System.out.println( getMyMachineId() + ": leaving flushing state" );
         if ( flushing )
         {
-            writeData( -2, -2 );
-            flushing = false;
+            synchronized ( this )
+            {
+                flushing = false;
+                writeData( -2, -2 );
+            }
         }
     }
 
@@ -722,7 +725,7 @@ public class ZooClient extends AbstractZooKeeperManager
     public void shutdown()
     {
         System.out.println( getMyMachineId() + ": closing zoo client" );
-        // watcher.shutdown();
+        watcher.shutdown();
         msgLog.close();
         this.shutdown = true;
         super.shutdown();
@@ -790,6 +793,12 @@ public class ZooClient extends AbstractZooKeeperManager
     }
 
     @Override
+    protected String getSequenceNr()
+    {
+        return sequenceNr;
+    }
+
+    @Override
     public String toString()
     {
         return getClass().getSimpleName() + "[serverId:" + machineId + ", seq:" + sequenceNr +
@@ -801,7 +810,7 @@ public class ZooClient extends AbstractZooKeeperManager
             implements Watcher
     {
         private final Queue<WatchedEvent> unprocessedEvents = new LinkedList<WatchedEvent>();
-        private final ExecutorService threadPool = Executors.newFixedThreadPool( 10 );
+        private final ExecutorService threadPool = Executors.newCachedThreadPool();
         private final AtomicInteger count = new AtomicInteger( 0 );
 
         /**
@@ -828,7 +837,6 @@ public class ZooClient extends AbstractZooKeeperManager
 
         public void shutdown()
         {
-            flushUnprocessedEvents( zooKeeper );
             threadPool.shutdown();
             try
             {
@@ -865,7 +873,12 @@ public class ZooClient extends AbstractZooKeeperManager
 
         private synchronized void runEventInThread( final WatchedEvent event, final ZooKeeper zoo )
         {
-            System.out.println( "Adding another thread with count " + count.get() );
+            if ( shutdown )
+            {
+                // throw new RuntimeException( getMyMachineId() +
+                // ": Cannot process event " + event + ", already shutdown" );
+            }
+            System.out.println( getMyMachineId() + ": Adding another thread with count " + count.get() );
             threadPool.submit( new Runnable()
             {
                 @Override
@@ -876,6 +889,8 @@ public class ZooClient extends AbstractZooKeeperManager
             } );
         }
 
+        private volatile boolean electionHappening = false;
+
         private void processEvent( WatchedEvent event, ZooKeeper zooKeeper )
         {
             try
@@ -883,7 +898,7 @@ public class ZooClient extends AbstractZooKeeperManager
                 count.incrementAndGet();
                 String path = event.getPath();
                 msgLog.logMessage( this + ", " + new Date() + " Got event: " + event + " (path=" + path + ")", true );
-                System.out.println( getMyMachineId() + ": " + " Got event: " + event + " (path=" + path + ")" );
+                System.out.println( getMyMachineId() + ": " + this + " Got event: " + event + " (path=" + path + ")" );
                 if ( path == null && event.getState() == Watcher.Event.KeeperState.Expired )
                 {
                     keeperState = KeeperState.Expired;
@@ -892,10 +907,16 @@ public class ZooClient extends AbstractZooKeeperManager
                 else if ( path == null && event.getState() == Watcher.Event.KeeperState.SyncConnected )
                 {
                     long newSessionId = zooKeeper.getSessionId();
-                    Pair<Master, Machine> masterBeforeIWrite = getMasterFromZooKeeper( false, false );
-                    msgLog.logMessage( "Get master before write:" + masterBeforeIWrite );
-                    boolean masterBeforeIWriteDiffers = masterBeforeIWrite.other().getMachineId() != getCachedMaster().other().getMachineId();
-                    if ( newSessionId != sessionId || masterBeforeIWriteDiffers )
+                    // Pair<Master, Machine> masterBeforeIWrite =
+                    // getMasterFromZooKeeper( false, false );
+                    // msgLog.logMessage( "Get master before write:" +
+                    // masterBeforeIWrite );
+                    boolean masterBeforeIWriteDiffers = true;// masterBeforeIWrite.other().getMachineId()
+                                                             // !=
+                                                             // getCachedMaster().other().getMachineId();
+                    if ( newSessionId != sessionId )// ||
+                                                    // masterBeforeIWriteDiffers
+                                                    // )
                     {
                         if ( writeLastCommittedTx )
                         {
@@ -949,10 +970,18 @@ public class ZooClient extends AbstractZooKeeperManager
                         // This event is for the masters eyes only so it should only
                         // be the (by zookeeper spoken) master which should make sure
                         // it really is master.
-                        if ( newMasterMachineId == machineId )
+                        if ( newMasterMachineId == machineId && !electionHappening )
                         {
-                            clusterReceiver.newMaster( new InformativeStackTrace(
-                                    "NodeDataChanged event received (someone though I should be the master)" ) );
+                            try
+                            {
+                                electionHappening = true;
+                                clusterReceiver.newMaster( new InformativeStackTrace(
+                                        "NodeDataChanged event received (someone though I should be the master)" ) );
+                            }
+                            finally
+                            {
+                                electionHappening = false;
+                            }
                         }
                     }
                     else if ( path.contains( MASTER_REBOUND_CHILD ) )
@@ -960,21 +989,30 @@ public class ZooClient extends AbstractZooKeeperManager
                         // This event is for all the others after the master got the
                         // MASTER_NOTIFY_CHILD which then shouts out to the others to
                         // become slaves if they don't already are.
-                        if ( newMasterMachineId != machineId )
+                        if ( newMasterMachineId != machineId && !electionHappening )
                         {
-                            clusterReceiver.newMaster( new InformativeStackTrace( "NodeDataChanged event received (new master ensures I'm slave)" ) );
+                            try
+                            {
+                                electionHappening = true;
+                                clusterReceiver.newMaster( new InformativeStackTrace(
+                                        "NodeDataChanged event received (new master ensures I'm slave)" ) );
+                            }
+                            finally
+                            {
+                                electionHappening = false;
+                            }
                         }
                     }
                     else if ( path.contains( FLUSH_REQUESTED_CHILD ) )
                     {
                         System.out.println( getMyMachineId() + ": got notification from " + newMasterMachineId );
-                        if ( newMasterMachineId >= -1 )
+                        if ( newMasterMachineId == STOP_FLUSHING )
                         {
-                            startFlushing();
+                            stopFlushing();
                         }
                         else
                         {
-                            stopFlushing();
+                            startFlushing();
                         }
                     }
                     else
