@@ -89,6 +89,7 @@ public class ZooClient extends AbstractZooKeeperManager
     private final Object keeperStateMonitor = new Object();
     private volatile KeeperState keeperState = KeeperState.Disconnected;
     private volatile boolean shutdown = false;
+    private volatile boolean flushing = false;
     private String rootPath;
     private volatile StoreId storeId;
 
@@ -463,7 +464,6 @@ public class ZooClient extends AbstractZooKeeperManager
             // Add watches to our master notification nodes
             subscribeToDataChangeWatcher( MASTER_NOTIFY_CHILD );
             subscribeToDataChangeWatcher( MASTER_REBOUND_CHILD );
-            System.out.println( getMyMachineId() + " setup over" );
             return created.substring( created.lastIndexOf( "_" ) + 1 );
         }
         catch ( KeeperException e )
@@ -631,7 +631,16 @@ public class ZooClient extends AbstractZooKeeperManager
         connection.setJMXConnectionData( new String( url ), new String( instanceId ) );
     }
 
-    private volatile boolean flushing = false;
+    /*
+     * Start/stop flushing infrastructure follows. When master goes down
+     * all machines will gang up and try to elect master. So we will get
+     * many "start flushing" events but we only need respect one. The same
+     * goes for stop flushing events. For that reason we first do a quick
+     * check if we are already in the state we are trying to reach and
+     * bail out quickly. Otherwise we just grab the lock and
+     * synchronously update. The checking outside the lock is the
+     * reason the flushing boolean flag is volatile.
+     */
 
     private void startFlushing()
     {
@@ -639,9 +648,16 @@ public class ZooClient extends AbstractZooKeeperManager
         {
             synchronized ( this )
             {
+                /*
+                 * This is here so we call getFirstMasterForTx() on the same
+                 * txid that we post - not strictly required since setCommitedTxId()
+                 * is synchronized, which means we can't have committedTx changed while
+                 * we are here.
+                 */
                 long txNow = committedTx;
                 flushing = true;
                 writeData( txNow, getFirstMasterForTx( txNow ) );
+                msgLog.logMessage( "Starting flushing of txids to zk, while at txid " + txNow );
             }
         }
     }
@@ -654,6 +670,7 @@ public class ZooClient extends AbstractZooKeeperManager
             {
                 flushing = false;
                 writeData( -2, -2 );
+                msgLog.logMessage( "Stopping flushing of txids to zk, while at txid " + committedTx );
             }
         }
     }
@@ -676,11 +693,7 @@ public class ZooClient extends AbstractZooKeeperManager
         byte[] data = dataRepresentingMe( tx, masterForThat );
         try
         {
-            // System.out.println( "Trying to write to" + path + " " + tx + ", "
-            // + masterForThat );
             zooKeeper.setData( path, data, -1 );
-            // System.out.println( "Wrote to" + path + " " + tx + ", " +
-            // masterForThat );
         }
         catch ( KeeperException e )
         {
@@ -724,7 +737,6 @@ public class ZooClient extends AbstractZooKeeperManager
     @Override
     public void shutdown()
     {
-        System.out.println( getMyMachineId() + ": closing zoo client" );
         watcher.shutdown();
         msgLog.close();
         this.shutdown = true;
@@ -812,6 +824,7 @@ public class ZooClient extends AbstractZooKeeperManager
         private final Queue<WatchedEvent> unprocessedEvents = new LinkedList<WatchedEvent>();
         private final ExecutorService threadPool = Executors.newCachedThreadPool();
         private final AtomicInteger count = new AtomicInteger( 0 );
+        private volatile boolean electionHappening = false;
 
         /**
          * Flush all events we got before initialization of
@@ -873,12 +886,10 @@ public class ZooClient extends AbstractZooKeeperManager
 
         private synchronized void runEventInThread( final WatchedEvent event, final ZooKeeper zoo )
         {
-            if ( shutdown )
+            if ( count.get() > 10 )
             {
-                // throw new RuntimeException( getMyMachineId() +
-                // ": Cannot process event " + event + ", already shutdown" );
+                msgLog.logMessage( "Adding another thread with count " + count.get() );
             }
-            System.out.println( getMyMachineId() + ": Adding another thread with count " + count.get() );
             threadPool.submit( new Runnable()
             {
                 @Override
@@ -889,8 +900,6 @@ public class ZooClient extends AbstractZooKeeperManager
             } );
         }
 
-        private volatile boolean electionHappening = false;
-
         private void processEvent( WatchedEvent event, ZooKeeper zooKeeper )
         {
             try
@@ -898,7 +907,6 @@ public class ZooClient extends AbstractZooKeeperManager
                 count.incrementAndGet();
                 String path = event.getPath();
                 msgLog.logMessage( this + ", " + new Date() + " Got event: " + event + " (path=" + path + ")", true );
-                System.out.println( getMyMachineId() + ": " + this + " Got event: " + event + " (path=" + path + ")" );
                 if ( path == null && event.getState() == Watcher.Event.KeeperState.Expired )
                 {
                     keeperState = KeeperState.Expired;
@@ -907,25 +915,12 @@ public class ZooClient extends AbstractZooKeeperManager
                 else if ( path == null && event.getState() == Watcher.Event.KeeperState.SyncConnected )
                 {
                     long newSessionId = zooKeeper.getSessionId();
-                    // Pair<Master, Machine> masterBeforeIWrite =
-                    // getMasterFromZooKeeper( false, false );
-                    // msgLog.logMessage( "Get master before write:" +
-                    // masterBeforeIWrite );
-                    boolean masterBeforeIWriteDiffers = true;// masterBeforeIWrite.other().getMachineId()
-                                                             // !=
-                                                             // getCachedMaster().other().getMachineId();
-                    if ( newSessionId != sessionId )// ||
-                                                    // masterBeforeIWriteDiffers
-                                                    // )
+                    if ( newSessionId != sessionId )
                     {
                         if ( writeLastCommittedTx )
                         {
                             sequenceNr = setup();
                             msgLog.logMessage( "Did setup, seq=" + sequenceNr + " new sessionId=" + newSessionId );
-                            // Pair<Master, Machine> masterAfterIWrote =
-                            // getMasterFromZooKeeper( false, false );
-                            // msgLog.logMessage( "Get master after write:" +
-                            // masterAfterIWrote );
                             if ( sessionId != -1 )
                             {
                                 clusterReceiver.newMaster( new InformativeStackTrace( "Got SyncConnected event from ZK" ) );
@@ -963,14 +958,14 @@ public class ZooClient extends AbstractZooKeeperManager
                 }
                 else if ( event.getType() == Watcher.Event.EventType.NodeDataChanged )
                 {
-                    int newMasterMachineId = toInt( getZooKeeper( true ).getData( path, true, null ) );
-                    msgLog.logMessage( "Got event data " + newMasterMachineId );
+                    int updatedData = toInt( getZooKeeper( true ).getData( path, true, null ) );
+                    msgLog.logMessage( "Got event data " + updatedData );
                     if ( path.contains( MASTER_NOTIFY_CHILD ) )
                     {
                         // This event is for the masters eyes only so it should only
                         // be the (by zookeeper spoken) master which should make sure
                         // it really is master.
-                        if ( newMasterMachineId == machineId && !electionHappening )
+                        if ( updatedData == machineId && !electionHappening )
                         {
                             try
                             {
@@ -989,7 +984,7 @@ public class ZooClient extends AbstractZooKeeperManager
                         // This event is for all the others after the master got the
                         // MASTER_NOTIFY_CHILD which then shouts out to the others to
                         // become slaves if they don't already are.
-                        if ( newMasterMachineId != machineId && !electionHappening )
+                        if ( updatedData != machineId && !electionHappening )
                         {
                             try
                             {
@@ -1005,8 +1000,7 @@ public class ZooClient extends AbstractZooKeeperManager
                     }
                     else if ( path.contains( FLUSH_REQUESTED_CHILD ) )
                     {
-                        System.out.println( getMyMachineId() + ": got notification from " + newMasterMachineId );
-                        if ( newMasterMachineId == STOP_FLUSHING )
+                        if ( updatedData == STOP_FLUSHING )
                         {
                             stopFlushing();
                         }

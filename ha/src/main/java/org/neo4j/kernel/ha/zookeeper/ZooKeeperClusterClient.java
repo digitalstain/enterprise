@@ -43,6 +43,7 @@ import org.neo4j.kernel.impl.util.StringLogger;
 public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements ClusterClient
 {
     protected static final int SESSION_TIME_OUT = 5000;
+    public static final int CLUSTER_CLIENT_MACHINE_ID = -1;
 
     private final ZooKeeper zooKeeper;
     private String rootPath;
@@ -112,6 +113,12 @@ public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements 
                 Thread.interrupted();
             }
         }
+    }
+
+    @Override
+    protected int getMyMachineId()
+    {
+        return CLUSTER_CLIENT_MACHINE_ID;
     }
 
     public int getBackupPort( int machineId )

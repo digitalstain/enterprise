@@ -208,10 +208,7 @@ public abstract class AbstractZooKeeperManager
                 clientLockReadTimeout, maxConcurrentChannelsPerSlave );
     }
 
-    protected int getMyMachineId()
-    {
-        return -1;
-    }
+    protected abstract int getMyMachineId();
 
     public Pair<Master, Machine> getCachedMaster()
     {
@@ -271,11 +268,10 @@ public abstract class AbstractZooKeeperManager
         return getAllMachines( wait, WaitMode.SESSION );
     }
 
-
     protected Map<Integer, ZooKeeperMachine> getAllMachines( boolean wait, WaitMode mode )
     {
         Map<Integer, ZooKeeperMachine> result = null;
-        while (result == null)
+        while ( result == null )
         {
             result = getAllMachinesInner( wait, mode );
         }
@@ -290,18 +286,31 @@ public abstract class AbstractZooKeeperManager
         }
         try
         {
-            int sequenceNumber = -1;
+            /*
+             * Optimization - we may have just connected (a fact known by no sequence number
+             * available). If we had just gone down we might be trying to read our own
+             * entry but that will never be updated. So instead of waiting for the node
+             * to expire, just skip it.
+             */
+            int mySequenceNumber = -1;
             try
             {
-                sequenceNumber = Integer.parseInt( getSequenceNr() );
+                mySequenceNumber = Integer.parseInt( getSequenceNr() );
             }
             catch ( NumberFormatException e )
             {
-                // ok
+                // ok, means we are not initialized yet
             }
 
             writeFlush( getMyMachineId() );
+            /*
+             * This is an optimization - we can go and check right away but we might get
+             * to the first machine before it manages to flush. So instead of going back
+             * and asking/trying again, we just wait a bit, makes the election finish faster
+             * on average.
+             */
             Thread.sleep( 100 );
+
             Map<Integer, ZooKeeperMachine> result = new HashMap<Integer, ZooKeeperMachine>();
             String root = getRoot();
             List<String> children = getZooKeeper( true ).getChildren( root, false );
@@ -319,26 +328,20 @@ public abstract class AbstractZooKeeperManager
                     int seq = parsedChild.other();
                     Pair<Long, Integer> instanceData = readDataRepresentingInstance( root + "/" + child );
                     long lastCommittedTxId = instanceData.first();
-                    int masterForTheAbove = instanceData.other();
-                    if ( id == getMyMachineId() )
+                    int masterId = instanceData.other();
+                    if ( id == getMyMachineId() && mySequenceNumber == -1 )
                     {
-                        System.out.println( getMyMachineId() + ": trying to read my entry with sequence number " + seq
-                                            + "(mine now is " + sequenceNumber + ")" );
-                        if ( sequenceNumber == -1 )
-                        {
-                            continue;
-                        }
+                        continue;
                     }
                     if ( lastCommittedTxId == -2 )
                     {
-                        System.out.println( getMyMachineId() + ": couldn't read " + id + "_" + seq + ", retrying" );
+                        msgLog.logMessage( "Couldn't read " + id + "_" + seq + ", retrying from scratch" );
                         return null;
                     }
                     if ( !result.containsKey( id ) || seq > result.get( id ).getSequenceId() )
                     {
-                        ZooKeeperMachine toAdd = new ZooKeeperMachine( id, seq, lastCommittedTxId, masterForTheAbove,
+                        ZooKeeperMachine toAdd = new ZooKeeperMachine( id, seq, lastCommittedTxId, masterId,
                                 getHaServer( id, wait ), HA_SERVERS_CHILD + "/" + id );
-                        System.out.println( getMyMachineId() + ": Adding " + toAdd );
                         result.put( id, toAdd );
                     }
                 }
@@ -347,10 +350,6 @@ public abstract class AbstractZooKeeperManager
                     if ( inner.code() != KeeperException.Code.NONODE )
                     {
                         throw new ZooKeeperException( "Unable to get master.", inner );
-                    }
-                    else
-                    {
-                        System.out.println( "Dude, " + child + " is sooooo gone" );
                     }
                 }
             }
@@ -539,18 +538,14 @@ public abstract class AbstractZooKeeperManager
                      *  may be down for the count. Instead wait a bit to finish, then reset, so we don't fall
                      *  into a livelock.
                      */
-                    System.out.println( getMyMachineId() + ": Will reset but waiting for " + current
-                                        + "to finish its thing" );
+                    msgLog.logMessage( "Conflicted with " + current
+                                       + " on getAllMachines() - will reset but waiting a bit" );
                     Thread.sleep( 300 );
                 }
                 if ( current != toWrite )
                 {
-                    System.out.println( getMyMachineId() + ": writing " + toWrite );
+                    msgLog.logMessage( "Writing at " + FLUSH_REQUESTED_CHILD + ": " + toWrite );
                     getZooKeeper( true ).setData( path, data, -1 );
-                }
-                else
-                {
-                    System.out.println( getMyMachineId() + ": didn't write " + toWrite );
                 }
             }
             // Set the watch
@@ -558,13 +553,11 @@ public abstract class AbstractZooKeeperManager
         }
         catch ( KeeperException e )
         {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            throw new ZooKeeperException( "Unable to write to " + FLUSH_REQUESTED_CHILD, e );
         }
         catch ( InterruptedException e )
         {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            throw new ZooKeeperException( "Interrupted while trying to write to " + FLUSH_REQUESTED_CHILD, e );
         }
     }
 
