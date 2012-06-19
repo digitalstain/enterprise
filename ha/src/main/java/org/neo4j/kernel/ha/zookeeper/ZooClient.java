@@ -888,7 +888,8 @@ public class ZooClient extends AbstractZooKeeperManager
         {
             if ( count.get() > 10 )
             {
-                msgLog.logMessage( "Adding another thread with count " + count.get() );
+                msgLog.logMessage( "Thread count is already at " + count.get()
+                                   + " and added another ZK event handler thread." );
             }
             threadPool.submit( new Runnable()
             {

@@ -522,13 +522,29 @@ public abstract class AbstractZooKeeperManager
         byte[] data = new byte[4];
         ByteBuffer buffer = ByteBuffer.wrap( data );
         buffer.putInt( toWrite );
+        boolean created = false;
         try
         {
             if ( getZooKeeper( true ).exists( path, false ) == null )
             {
-                getZooKeeper( true ).create( path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT );
+                try
+                {
+                    getZooKeeper( true ).create( path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT );
+                    created = true;
+                }
+                catch ( KeeperException inner )
+                {
+                    /*
+                     *  While we checked, there could be a race and someone else created it
+                     *  after we checked but before we create it. That is acceptable.
+                     */
+                    if ( inner.code() != KeeperException.Code.NODEEXISTS )
+                    {
+                        throw inner;
+                    }
+                }
             }
-            else
+            if ( !created )
             {
                 int current = ByteBuffer.wrap( getZooKeeper( true ).getData( path, false, null ) ).getInt();
                 if ( current != STOP_FLUSHING && toWrite == STOP_FLUSHING && current != getMyMachineId() )
