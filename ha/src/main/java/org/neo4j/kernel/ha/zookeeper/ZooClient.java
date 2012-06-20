@@ -173,7 +173,7 @@ public class ZooClient extends AbstractZooKeeperManager
                 conf.getInteger( max_concurrent_channels_per_slave ),
                 clientLockReadTimeout, new BranchDetectingTxVerifier( graphDb ) );
     }
-
+    
     @Override
     protected StoreId getStoreId()
     {

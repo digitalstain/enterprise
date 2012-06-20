@@ -26,7 +26,6 @@ import org.neo4j.helpers.Pair;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha.zookeeper.Machine;
-import org.neo4j.kernel.ha.Master;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 public class FakeSlaveBroker extends AbstractBroker
