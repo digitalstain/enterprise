@@ -68,6 +68,7 @@ public abstract class AbstractZooKeeperManager
 
     public AbstractZooKeeperManager( String servers, StringLogger msgLog,
             int clientReadTimeout, int clientLockReadTimeout, int maxConcurrentChannelsPerSlave, int sessionTimeout )
+
     {
         assert msgLog != null;
 
@@ -190,7 +191,13 @@ public abstract class AbstractZooKeeperManager
         }
         return cachedMaster;
     }
-    
+
+    protected StoreId getStoreId()
+    {
+        // TODO
+        return null;
+    }
+
     protected StoreId getStoreId()
     {
         // TODO
@@ -203,7 +210,7 @@ public abstract class AbstractZooKeeperManager
         {
             return NO_MASTER;
         }
-        return new MasterClient( master.getServer().first(),
+        return new MasterClient18( master.getServer().first(),
                 master.getServer().other(), this.msgLog, getStoreId(),
                 ConnectionLostHandler.NO_ACTION, clientReadTimeout,
     }

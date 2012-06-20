@@ -1508,7 +1508,7 @@ public class HighlyAvailableGraphDatabase
             @Override
             public ZooClient newZooClient()
             {
-                        return new ZooClient( storeDir, messageLog, storeIdGetter, configuration, /* as SlaveDatabaseOperations for extracting master for tx */
+                return new ZooClient( storeDir, messageLog, configuration, /* as SlaveDatabaseOperations for extracting master for tx */
                         slaveOperations, /* as ClusterEventReceiver */slaveOperations, MasterClientFactory.F18 );
             }
         } );
@@ -1898,7 +1898,7 @@ public class HighlyAvailableGraphDatabase
     {
         return localGraph().getGuard();
     }
-    
+
     @Override
     public StoreId getStoreId()
     {

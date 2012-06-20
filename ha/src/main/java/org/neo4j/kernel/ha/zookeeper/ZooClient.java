@@ -106,8 +106,8 @@ public class ZooClient extends AbstractZooKeeperManager
     private final boolean allowCreateCluster;
     private final WatcherImpl watcher;
 
-    public ZooClient( String storeDir, StringLogger stringLogger, Config conf,
-            SlaveDatabaseOperations localDatabase, ClusterEventReceiver clusterReceiver )
+    public ZooClient( String storeDir, StringLogger stringLogger, Config conf, SlaveDatabaseOperations localDatabase,
+            ClusterEventReceiver clusterReceiver )
     {
         super( conf.get( HaSettings.coordinators ), stringLogger,
             conf.getInteger( read_timeout ),

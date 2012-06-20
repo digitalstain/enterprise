@@ -36,11 +36,10 @@ public class MadeUpClient extends Client18<MadeUpCommunicationInterface> impleme
 
     public MadeUpClient( int port, StoreId storeIdToExpect, byte internalProtocolVersion, byte applicationProtocolVersion )
     {
-        super( "localhost", port, StringLogger.DEV_NULL, Client18.NO_STORE_ID_GETTER, MadeUpServer.FRAME_LENGTH,
+        super( "localhost", port, StringLogger.DEV_NULL, storeIdToExpect, MadeUpServer.FRAME_LENGTH,
                 applicationProtocolVersion, Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
                 Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT,
                 Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT );
-        this.storeIdToExpect = storeIdToExpect;
         this.internalProtocolVersion = internalProtocolVersion;
     }
 

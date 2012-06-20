@@ -65,8 +65,6 @@ public interface MasterClient extends Master
 
     public Response<Void> initializeTx( SlaveContext context );
 
-    public Response<LockResult> acquireNodeWriteLock( SlaveContext context, long... nodes );
-
     public Response<LockResult> acquireNodeReadLock( SlaveContext context, long... nodes );
 
     public Response<LockResult> acquireRelationshipWriteLock( SlaveContext context, long... relationships );
