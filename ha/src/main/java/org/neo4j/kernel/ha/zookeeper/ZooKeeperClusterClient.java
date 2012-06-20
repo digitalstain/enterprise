@@ -55,18 +55,6 @@ public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements 
         this( zooKeeperServers, ConfigurationDefaults.getDefault( HaSettings.cluster_name, HaSettings.class));
     }
 
-//    public ZooKeeperClusterClient( String zooKeeperServers,
-//            AbstractGraphDatabase db )
-//    {
-//<<<<<<< HEAD
-//        super(zooKeeperServers, StringLogger.SYSTEM, Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
-//              Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
-//              Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT);
-//=======
-//        this( zooKeeperServers, StringLogger.SYSTEM, HaConfig.CONFIG_DEFAULT_HA_CLUSTER_NAME, db,
-//                HaConfig.CONFIG_DEFAULT_ZK_SESSION_TIMEOUT );
-//    }
-
     public ZooKeeperClusterClient( String zooKeeperServers, String clusterName )
     {
         this( zooKeeperServers, StringLogger.SYSTEM, clusterName, Integer.parseInt( ConfigurationDefaults.getDefault(
@@ -76,9 +64,11 @@ public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements 
     public ZooKeeperClusterClient( String zooKeeperServers, StringLogger msgLog, String clusterName,
             int sessionTimeout, MasterClientFactory factory )
     {
-        super( zooKeeperServers, Client18.NO_STORE_ID_GETTER, msgLog, Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+        super( zooKeeperServers, msgLog,
                 Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
-                Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT, sessionTimeout, factory );
+                Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT,
+                sessionTimeout );
         this.clusterName = clusterName;
         try
         {

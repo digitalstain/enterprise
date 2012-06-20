@@ -31,7 +31,6 @@ import org.apache.zookeeper.ZooKeeper;
 import org.neo4j.com.ComException;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
-import org.neo4j.com.StoreIdGetter;
 import org.neo4j.com.StoreWriter;
 import org.neo4j.com.TxExtractor;
 import org.neo4j.helpers.Pair;
@@ -62,17 +61,16 @@ public abstract class AbstractZooKeeperManager
     protected final int clientLockReadTimeout;
     private final long sessionTimeout;
 
-    private final StoreIdGetter storeIdGetter;
     private final MasterClientFactory masterClientFactory;
 
-    public AbstractZooKeeperManager( String servers, StoreIdGetter storeIdGetter, StringLogger msgLog,
-            int clientReadTimeout, int clientLockReadTimeout, int maxConcurrentChannelsPerSlave, int sessionTimeout,
+    public AbstractZooKeeperManager( String servers, StringLogger msgLog,
+ int clientReadTimeout,
+            int clientLockReadTimeout, int maxConcurrentChannelsPerSlave, int sessionTimeout,
             MasterClientFactory masterClientFactory )
     {
         assert msgLog != null;
 
         this.servers = servers;
-        this.storeIdGetter = storeIdGetter;
         this.msgLog = msgLog;
         this.clientLockReadTimeout = clientLockReadTimeout;
         this.maxConcurrentChannelsPerSlave = maxConcurrentChannelsPerSlave;
@@ -189,16 +187,20 @@ public abstract class AbstractZooKeeperManager
         return cachedMaster;
     }
 
+    protected StoreId getStoreId()
+    {
+        // TODO
+        return null;
+    }
+
     protected Master getMasterClientToMachine( Machine master )
     {
         if ( master == Machine.NO_MACHINE || master.getServer() == null )
         {
             return NO_MASTER;
         }
-        return masterClientFactory.instantiate( master.getServer().first(),
-                master.getServer().other(), this.msgLog, storeIdGetter,
-                clientReadTimeout,
-                clientLockReadTimeout, maxConcurrentChannelsPerSlave );
+        return masterClientFactory.instantiate( master.getServer().first(), master.getServer().other(), this.msgLog,
+                getStoreId(), clientReadTimeout, clientLockReadTimeout, maxConcurrentChannelsPerSlave );
     }
 
     protected abstract int getMyMachineId();

@@ -50,7 +50,6 @@ import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.neo4j.backup.OnlineBackupSettings;
-import org.neo4j.com.StoreIdGetter;
 import org.neo4j.helpers.Exceptions;
 import org.neo4j.helpers.Pair;
 import org.neo4j.kernel.GraphDatabaseAPI;
@@ -103,12 +102,10 @@ public class ZooClient extends AbstractZooKeeperManager
     private final String clusterName;
     private final boolean allowCreateCluster;
 
-    public ZooClient( String storeDir, StringLogger stringLogger, StoreIdGetter storeIdGetter, Config conf,
-            SlaveDatabaseOperations localDatabase, ClusterEventReceiver clusterReceiver,
-            MasterClientFactory masterClientFactory )
+    public ZooClient( String storeDir, StringLogger stringLogger, Config conf, SlaveDatabaseOperations localDatabase,
+            ClusterEventReceiver clusterReceiver, MasterClientFactory masterClientFactory )
     {
-        super( conf.get( HaSettings.coordinators ),
-            storeIdGetter, stringLogger,
+        super( conf.get( HaSettings.coordinators ), stringLogger,
             conf.getInteger( read_timeout ),
             conf.isSet( lock_read_timeout ) ? conf.getInteger( lock_read_timeout) : conf.getInteger( read_timeout ),
                 conf.getInteger( max_concurrent_channels_per_slave ), conf.getInteger( zk_session_timeout ),
@@ -171,6 +168,12 @@ public class ZooClient extends AbstractZooKeeperManager
                 Machine.splitIpAndPort( haServer ).other(), graphDb.getMessageLog(),
                 conf.getInteger( max_concurrent_channels_per_slave ),
                 clientLockReadTimeout, new BranchDetectingTxVerifier( graphDb ) );
+    }
+
+    @Override
+    protected StoreId getStoreId()
+    {
+        return storeId;
     }
 
     @Override

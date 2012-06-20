@@ -20,32 +20,32 @@
 package org.neo4j.kernel.ha;
 
 import org.neo4j.com.ConnectionLostHandler;
-import org.neo4j.com.StoreIdGetter;
+import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 public interface MasterClientFactory
 {
     public static final MasterClientFactory DEFAULT_FACTORY = null;
 
-    public MasterClient instantiate( String hostNameOrIp, int port, StringLogger stringLogger,
-            StoreIdGetter storeIdGetter, int readTimeoutSeconds, int lockReadTimeout, int maxConcurrentChannels );
+    public MasterClient instantiate( String hostNameOrIp, int port, StringLogger stringLogger, StoreId storeId,
+            int readTimeoutSeconds, int lockReadTimeout, int maxConcurrentChannels );
 
     public static final MasterClientFactory F153 = new MasterClientFactory()
     {
-        public MasterClient instantiate( String hostNameOrIp, int port, StringLogger stringLogger,
-                StoreIdGetter storeIdGetter, int readTimeoutSeconds, int lockReadTimeout, int maxConcurrentChannels )
+        public MasterClient instantiate( String hostNameOrIp, int port, StringLogger stringLogger, StoreId storeId,
+                int readTimeoutSeconds, int lockReadTimeout, int maxConcurrentChannels )
         {
-            return new MasterClient153( hostNameOrIp, port, stringLogger, storeIdGetter,
+            return new MasterClient153( hostNameOrIp, port, stringLogger, storeId,
                     ConnectionLostHandler.NO_ACTION, readTimeoutSeconds, lockReadTimeout, maxConcurrentChannels );
         }
     };
 
     public static final MasterClientFactory F18 = new MasterClientFactory()
     {
-        public MasterClient instantiate( String hostNameOrIp, int port, StringLogger stringLogger,
-                StoreIdGetter storeIdGetter, int readTimeoutSeconds, int lockReadTimeout, int maxConcurrentChannels )
+        public MasterClient instantiate( String hostNameOrIp, int port, StringLogger stringLogger, StoreId storeId,
+                int readTimeoutSeconds, int lockReadTimeout, int maxConcurrentChannels )
         {
-            return new MasterClient18( hostNameOrIp, port, stringLogger, storeIdGetter,
+            return new MasterClient18( hostNameOrIp, port, stringLogger, storeId,
                     ConnectionLostHandler.NO_ACTION, readTimeoutSeconds, lockReadTimeout, maxConcurrentChannels );
         }
     };

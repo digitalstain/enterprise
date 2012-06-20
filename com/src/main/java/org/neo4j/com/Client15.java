@@ -71,27 +71,25 @@ public abstract class Client15<M> implements ChannelPipelineFactory
     private final StringLogger msgLog;
     private final ExecutorService executor;
     private final ResourcePool<Triplet<Channel, ChannelBuffer, ByteBuffer>> channelPool;
-    private StoreId myStoreId;
+    private final StoreId myStoreId;
     private final int frameLength;
     private final int readTimeout;
     private final byte applicationProtocolVersion;
     private final ResourceReleaser resourcePoolReleaser;
-    private final StoreIdGetter storeIdGetter;
 
-    public Client15( String hostNameOrIp, int port, StringLogger logger, StoreIdGetter storeIdGetter, int frameLength,
+    public Client15( String hostNameOrIp, int port, StringLogger logger, StoreId storeId, int frameLength,
             byte applicationProtocolVersion, int readTimeout, int maxConcurrentChannels, int maxUnusedPoolSize )
     {
-        this( hostNameOrIp, port, logger, storeIdGetter, frameLength, applicationProtocolVersion, readTimeout,
-                maxConcurrentChannels,
-                maxUnusedPoolSize, ConnectionLostHandler.NO_ACTION );
+        this( hostNameOrIp, port, logger, storeId, frameLength, applicationProtocolVersion, readTimeout,
+                maxConcurrentChannels, maxUnusedPoolSize, ConnectionLostHandler.NO_ACTION );
     }
 
-    public Client15( String hostNameOrIp, int port, StringLogger logger, StoreIdGetter storeIdGetter, int frameLength,
+    public Client15( String hostNameOrIp, int port, StringLogger logger, StoreId storeId, int frameLength,
             byte applicationProtocolVersion, int readTimeout, int maxConcurrentChannels, int maxUnusedPoolSize,
             final ConnectionLostHandler connectionLostHandler )
     {
         this.frameLength = frameLength;
-        this.storeIdGetter = storeIdGetter;
+        this.myStoreId = storeId;
         this.applicationProtocolVersion = applicationProtocolVersion;
         this.readTimeout = readTimeout;
         channelPool = new ResourcePool<Triplet<Channel, ChannelBuffer, ByteBuffer>>( maxConcurrentChannels,
@@ -256,7 +254,6 @@ public abstract class Client15<M> implements ChannelPipelineFactory
 
     protected StoreId getMyStoreId()
     {
-        if ( myStoreId == null ) myStoreId = storeIdGetter.get();
         return myStoreId;
     }
 

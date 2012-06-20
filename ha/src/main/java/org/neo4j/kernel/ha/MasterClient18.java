@@ -38,7 +38,6 @@ import org.neo4j.com.ResourceReleaser;
 import org.neo4j.com.Response;
 import org.neo4j.com.Serializer;
 import org.neo4j.com.SlaveContext;
-import org.neo4j.com.StoreIdGetter;
 import org.neo4j.com.StoreWriter;
 import org.neo4j.com.TransactionStream;
 import org.neo4j.com.TxExtractor;
@@ -59,10 +58,10 @@ public class MasterClient18 extends Client18<Master> implements MasterClient
 
     private final int lockReadTimeout;
 
-    public MasterClient18( String hostNameOrIp, int port, StringLogger stringLogger, StoreIdGetter storeIdGetter, ConnectionLostHandler connectionLostHandler,
+    public MasterClient18( String hostNameOrIp, int port, StringLogger stringLogger, StoreId storeId, ConnectionLostHandler connectionLostHandler,
             int readTimeoutSeconds, int lockReadTimeout, int maxConcurrentChannels )
     {
-        super( hostNameOrIp, port, stringLogger, storeIdGetter,
+        super( hostNameOrIp, port, stringLogger, storeId,
                 MasterServer.FRAME_LENGTH, MasterServer.PROTOCOL_VERSION, readTimeoutSeconds,
                 maxConcurrentChannels, Math.min( maxConcurrentChannels, DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT ),connectionLostHandler );
         this.lockReadTimeout = lockReadTimeout;
