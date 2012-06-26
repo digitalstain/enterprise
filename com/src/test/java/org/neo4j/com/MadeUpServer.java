@@ -19,8 +19,6 @@
  */
 package org.neo4j.com;
 
-import static org.neo4j.com.Protocol.readString;
-
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.Channel;
 import org.neo4j.kernel.impl.util.StringLogger;
