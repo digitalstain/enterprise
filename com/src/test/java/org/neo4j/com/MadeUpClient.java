@@ -20,6 +20,7 @@
 package org.neo4j.com;
 
 import static org.neo4j.com.Protocol.writeString;
+import static org.neo4j.com.SlaveContext.Tx.lastAppliedTx;
 import static org.neo4j.kernel.configuration.Config.DEFAULT_DATA_SOURCE_NAME;
 
 import java.io.IOException;
@@ -52,7 +53,7 @@ public class MadeUpClient extends Client18<MadeUpCommunicationInterface> impleme
     @Override
     public Response<Integer> multiply( final int value1, final int value2 )
     {
-        return sendRequest( MadeUpRequestType.MULTIPLY, SlaveContext.EMPTY, new Serializer()
+        return sendRequest( MadeUpRequestType.MULTIPLY, context(), new Serializer()
         {
             @Override
             public void write( ChannelBuffer buffer, ByteBuffer readBuffer ) throws IOException
