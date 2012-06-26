@@ -44,7 +44,8 @@ public class MadeUpServer extends Server<MadeUpCommunicationInterface, Void>
             Byte applicationProtocolVersionInResponse )
     {
         super( realMaster, port, StringLogger.DEV_NULL, FRAME_LENGTH, applicationProtocolVersion,
-                DEFAULT_MAX_NUMBER_OF_CONCURRENT_TRANSACTIONS, Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS, txVerifier );
+                DEFAULT_MAX_NUMBER_OF_CONCURRENT_TRANSACTIONS, Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                txVerifier );
         this.internalProtocolVersion = internalProtocolVersion;
         this.appProtocolVersion = applicationProtocolVersion;
         this.internalProtocolVersionInResponse = internalProtocolVersionInResponse;
@@ -57,7 +58,7 @@ public class MadeUpServer extends Server<MadeUpCommunicationInterface, Void>
     {
         responseWritten = true;
     }
-    
+
     @Override
     protected void writeFailureResponse( Throwable exception, ChunkingChannelBuffer buffer )
     {
@@ -70,7 +71,7 @@ public class MadeUpServer extends Server<MadeUpCommunicationInterface, Void>
     {
         return internalProtocolVersion;
     }
-    
+
     @Override
     protected ChunkingChannelBuffer newChunkingChannelBuffer( ChannelBuffer targetBuffer, Channel channel )
     {
@@ -89,12 +90,12 @@ public class MadeUpServer extends Server<MadeUpCommunicationInterface, Void>
     protected void finishOffChannel( Channel channel, SlaveContext context )
     {
     }
-    
+
     public boolean responseHasBeenWritten()
     {
         return responseWritten;
     }
-    
+
     public boolean responseFailureEncountered()
     {
         return responseFailureEncountered;
@@ -112,8 +113,8 @@ public class MadeUpServer extends Server<MadeUpCommunicationInterface, Void>
                 int value2 = input.readInt();
                 return master.multiply( value1, value2 );
             }
-        }, Protocol.INTEGER_SERIALIZER ),
-        
+        }, Protocol18.INTEGER_SERIALIZER ),
+
         STREAM_SOME_DATA( new MasterCaller<MadeUpCommunicationInterface, Void>()
         {
             @Override
@@ -123,8 +124,8 @@ public class MadeUpServer extends Server<MadeUpCommunicationInterface, Void>
                 int dataSize = input.readInt();
                 return master.streamSomeData( new ToChannelBufferWriter( target ), dataSize );
             }
-        }, Protocol.VOID_SERIALIZER ),
-        
+        }, Protocol18.VOID_SERIALIZER ),
+
         THROW_EXCEPTION( new MasterCaller<MadeUpCommunicationInterface, Integer>()
         {
             @Override
@@ -133,11 +134,11 @@ public class MadeUpServer extends Server<MadeUpCommunicationInterface, Void>
             {
                 return master.throwException( readString( input ) );
             }
-        }, Protocol.VOID_SERIALIZER );
-        
+        }, Protocol18.VOID_SERIALIZER );
+
         private final MasterCaller masterCaller;
         private final ObjectSerializer serializer;
-        
+
         MadeUpRequestType( MasterCaller masterCaller, ObjectSerializer serializer )
         {
             this.masterCaller = masterCaller;

@@ -32,6 +32,11 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.Ignore;
+<<<<<<< HEAD
+=======
+import org.neo4j.com.Client;
+import org.neo4j.com.Protocol18;
+>>>>>>> Intermediate
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Format;
 import org.neo4j.kernel.HighlyAvailableGraphDatabase;
@@ -121,27 +126,14 @@ public class StandaloneDatabase
                             config.put( HaSettings.server_id.name(), Integer.toString( getMachineId() ) );
                             Config configuration = new Config( new ConfigurationDefaults(GraphDatabaseSettings.class, HaSettings.class ).apply( removeDashes(config) ));
 
-                            return new FakeSlaveBroker( getMessageLog(), masterId, configuration);
+                            return new FakeSlaveBroker( new MasterClient( "localhost",
+                                    Protocol18.PORT, getMessageLog(), storeIdGetter, Client.ConnectionLostHandler.NO_ACTION, Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                                    Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                                    Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT ),
+                                    masterId, configuration);
                         }
                     }
                 };
-//=======
-//                    broker = new FakeSlaveBroker( new MasterClient( "localhost",
-//                                            Protocol.PORT,
-//                                            placeHolderGraphDb,
-//                                            null,
-//                                            Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
-//                            Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
-//                            Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT ),
-//                            masterId, machineId, placeHolderGraphDb );
-//                }
-//                config = removeDashes( config );
-//                HighlyAvailableGraphDatabase db = new HighlyAvailableGraphDatabase( new HAGraphDb( storeDir, config,
-//                                        AbstractHaTest.wrapBrokerAndSetPlaceHolderDb(
-//                                                placeHolderGraphDb, broker ),
-//                                        new FakeClusterClient( broker ) ) );
-//                placeHolderGraphDb.setDb( db );
-//>>>>>>> master
                 System.out.println( "Started HA db (w/o zoo keeper)" );
                 return haGraphDb;
             }

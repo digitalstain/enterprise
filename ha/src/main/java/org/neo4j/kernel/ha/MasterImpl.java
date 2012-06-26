@@ -19,6 +19,8 @@
  */
 package org.neo4j.kernel.ha;
 
+import static java.util.Collections.synchronizedMap;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,13 +30,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
 import javax.transaction.NotSupportedException;
 import javax.transaction.SystemException;
 import javax.transaction.Transaction;
 import javax.transaction.TransactionManager;
+
 import org.neo4j.com.MasterUtil;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
+import org.neo4j.com.SlaveContext18;
 import org.neo4j.com.StoreWriter;
 import org.neo4j.com.TxExtractor;
 import org.neo4j.graphdb.Node;
@@ -55,8 +60,6 @@ import org.neo4j.kernel.impl.transaction.LockManager;
 import org.neo4j.kernel.impl.transaction.LockType;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 import org.neo4j.kernel.impl.util.StringLogger;
-
-import static java.util.Collections.*;
 
 /**
  * This is the real master code that executes on a master. The actual
@@ -131,7 +134,7 @@ public class MasterImpl implements Master
     {
         return this.graphDb;
     }
-    
+
     @Override
     public Response<Void> initializeTx( SlaveContext context )
     {
@@ -279,14 +282,14 @@ public class MasterImpl implements Master
                 finishThisAndResumeOther( otherTx, txId, false );
                 return;
             }
-            
+
             TransactionManager txManager = graphDb.getTxManager();
-            
+
             // update time stamp to current time so that we know that this tx just completed
             // a request and can now again start to be monitored, so that it can be
             // rolled back if it's getting old.
             tx.updateTime();
-            
+
             txManager.suspend();
             if ( otherTx != null )
             {
@@ -380,7 +383,7 @@ public class MasterImpl implements Master
         IdGenerator generator = graphDb.getIdGeneratorFactory().get( idType );
         IdAllocation result = new IdAllocation( generator.nextIdBatch( ID_GRAB_SIZE ), generator.getHighId(),
                 generator.getDefragCount() );
-        return MasterUtil.packResponseWithoutTransactionStream( graphDb, SlaveContext.EMPTY, result );
+        return MasterUtil.packResponseWithoutTransactionStream( graphDb, SlaveContext18.EMPTY, result );
     }
 
     public Response<Long> commitSingleResourceTransaction( SlaveContext context, String resource,
@@ -423,7 +426,7 @@ public class MasterImpl implements Master
             transactions.get( context ).markAsFinishAsap();
             throw e;
         }
-        
+
         finishThisAndResumeOther( otherTx, context, success );
         return packResponse( context, null );
     }
@@ -446,7 +449,7 @@ public class MasterImpl implements Master
         try
         {
             Pair<Integer, Long> masterId = nioneoDataSource.getMasterForCommittedTx( txId );
-            return MasterUtil.packResponseWithoutTransactionStream( graphDb, SlaveContext.EMPTY, masterId );
+            return MasterUtil.packResponseWithoutTransactionStream( graphDb, SlaveContext18.EMPTY, masterId );
         }
         catch ( IOException e )
         {
@@ -530,33 +533,33 @@ public class MasterImpl implements Master
         }
         return result;
     }
-    
+
     static class MasterTransaction
     {
         private final Transaction transaction;
         private final AtomicLong timeLastSuspended = new AtomicLong();
         private volatile boolean finishAsap;
-        
+
         MasterTransaction( Transaction transaction )
         {
             this.transaction = transaction;
         }
-        
+
         void updateTime()
         {
             this.timeLastSuspended.set( System.currentTimeMillis() );
         }
-        
+
         void resetTime()
         {
             this.timeLastSuspended.set( 0 );
         }
-        
+
         void markAsFinishAsap()
         {
             this.finishAsap = true;
         }
-        
+
         boolean finishAsap()
         {
             return this.finishAsap;

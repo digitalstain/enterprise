@@ -39,7 +39,7 @@ public class ToNetworkStoreWriter implements StoreWriter
     {
         char[] chars = path.toCharArray();
         targetBuffer.writeShort( chars.length );
-        Protocol.writeChars( targetBuffer, chars );
+        Protocol18.writeChars( targetBuffer, chars );
         targetBuffer.writeByte( hasData ? 1 : 0 );
         // TODO Make use of temporaryBuffer?
         BlockLogBuffer buffer = new BlockLogBuffer( targetBuffer );

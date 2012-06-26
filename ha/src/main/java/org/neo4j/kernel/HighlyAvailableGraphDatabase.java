@@ -47,6 +47,7 @@ import org.neo4j.com.MasterUtil;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
 import org.neo4j.com.SlaveContext.Tx;
+import org.neo4j.com.SlaveContext18;
 import org.neo4j.com.ToFileStoreWriter;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
@@ -769,7 +770,7 @@ public class HighlyAvailableGraphDatabase
 
     private SlaveContext emptyContext()
     {
-        return new SlaveContext( 0, machineId, 0, new Tx[0], 0, 0 );
+        return new SlaveContext18( 0, machineId, 0, new Tx[0], 0, 0 );
     }
 
     private long highestLogVersion( String targetStoreDir )

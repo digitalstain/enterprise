@@ -27,12 +27,11 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.jboss.netty.channel.Channel;
-import org.neo4j.com.Protocol;
+import org.neo4j.com.Protocol18;
 import org.neo4j.com.RequestType;
 import org.neo4j.com.Server;
 import org.neo4j.com.SlaveContext;
 import org.neo4j.com.TxChecksumVerifier;
-import org.neo4j.kernel.ha.MasterClient.HaRequestType;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 /**
@@ -44,9 +43,9 @@ public class MasterServer extends Server<Master, Void>
     /* Version 1 first version
      * Version 2 since 2012-01-24
      * Version 3 since 2012-02-16 */
-    static final byte PROTOCOL_VERSION = 3;
+    static final byte PROTOCOL_VERSION = 2;
 
-    static final int FRAME_LENGTH = Protocol.DEFAULT_FRAME_LENGTH;
+    static final int FRAME_LENGTH = Protocol18.DEFAULT_FRAME_LENGTH;
 
     public MasterServer( Master realMaster, final int port, StringLogger logger, int maxConcurrentTransactions,
             int oldChannelThreshold, TxChecksumVerifier txVerifier )
@@ -58,7 +57,7 @@ public class MasterServer extends Server<Master, Void>
     @Override
     protected RequestType<Master> getRequestContext( byte id )
     {
-        return HaRequestType.values()[id];
+        return HaRequestType18.values()[id];
     }
 
     @Override
@@ -73,7 +72,7 @@ public class MasterServer extends Server<Master, Void>
         getMaster().shutdown();
         super.shutdown();
     }
-    
+
     @Override
     protected boolean shouldLogFailureToFinishOffChannel( Throwable failure )
     {

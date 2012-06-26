@@ -22,7 +22,7 @@ package org.neo4j.backup;
 import org.jboss.netty.channel.Channel;
 import org.neo4j.backup.BackupClient.BackupRequestType;
 import org.neo4j.com.Client;
-import org.neo4j.com.Protocol;
+import org.neo4j.com.Protocol18;
 import org.neo4j.com.RequestType;
 import org.neo4j.com.Server;
 import org.neo4j.com.SlaveContext;
@@ -34,7 +34,7 @@ class BackupServer extends Server<TheBackupInterface, Object>
     static final byte PROTOCOL_VERSION = 1;
     private final BackupRequestType[] contexts = BackupRequestType.values();
     static int DEFAULT_PORT = DEFAULT_BACKUP_PORT;
-    static final int FRAME_LENGTH = Protocol.MEGA*4;
+    static final int FRAME_LENGTH = Protocol18.MEGA*4;
     
     public BackupServer( TheBackupInterface realMaster, int port, StringLogger logger )
     {

@@ -27,6 +27,7 @@ import javax.transaction.TransactionManager;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
 import org.neo4j.com.SlaveContext.Tx;
+import org.neo4j.com.SlaveContext18;
 import org.neo4j.com.TxExtractor;
 import org.neo4j.kernel.impl.transaction.TxManager;
 import org.neo4j.kernel.impl.transaction.xaframework.LogBuffer;
@@ -108,7 +109,6 @@ public class SlaveTxIdGenerator implements TxIdGenerator
         }
     }
 
-    @SuppressWarnings( "unchecked" )
     private SlaveContext onlyForThisDataSource( SlaveContext slaveContext, XaDataSource dataSource )
     {
         Tx txForDs = null;
@@ -125,7 +125,7 @@ public class SlaveTxIdGenerator implements TxIdGenerator
             throw new RuntimeException( "Apparently " + slaveContext +
                     " didn't have the XA data source we are commiting (" + dataSource.getName() + ")" );
         }
-        return new SlaveContext( slaveContext.getSessionId(), slaveContext.machineId(),
+        return new SlaveContext18( slaveContext.getSessionId(), slaveContext.machineId(),
                 slaveContext.getEventIdentifier(), new Tx[] {txForDs}, slaveContext.getMasterId(),
                 slaveContext.getChecksum() );
     }
