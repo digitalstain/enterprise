@@ -47,6 +47,7 @@ import org.neo4j.com.MasterUtil;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
 import org.neo4j.com.SlaveContext.Tx;
+import org.neo4j.com.SlaveContext18;
 import org.neo4j.com.StoreIdGetter;
 import org.neo4j.com.ToFileStoreWriter;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -799,7 +800,7 @@ public class HighlyAvailableGraphDatabase
 
     private SlaveContext emptyContext()
     {
-        return new SlaveContext( 0, machineId, 0, new Tx[0], 0, 0 );
+        return new SlaveContext18( 0, machineId, 0, new Tx[0], 0, 0 );
     }
 
     private long highestLogVersion( String targetStoreDir )
@@ -918,9 +919,9 @@ public class HighlyAvailableGraphDatabase
                     newMaster( storeId, new NullPointerException(
                             "master returned from broker" ) );
                 }
-                
+
                 SlaveContext slaveContext = null;
-                
+
                 // If this method is called from the outside then we need to tell the caller
                 // that this update wasn't performed due to either a shutdown or an internal restart,
                 // so throw NoMasterException
@@ -934,7 +935,7 @@ public class HighlyAvailableGraphDatabase
                         return;
                     slaveContext = slaveOperations.getSlaveContext( -1 );
                 }
-                
+
                 // The above synchronization only guards for getting the SlaveContext,
                 // but an internal(shutdown) can still happen in the middle of receive.
                 // This is a general problem which should be taken care of in a general

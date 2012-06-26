@@ -19,7 +19,7 @@
  */
 package org.neo4j.com;
 
-import static org.neo4j.com.Protocol.writeString;
+import static org.neo4j.com.Protocol18.writeString;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -29,18 +29,18 @@ import org.neo4j.com.MadeUpServer.MadeUpRequestType;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.util.StringLogger;
 
-public class MadeUpClient extends Client<MadeUpCommunicationInterface> implements MadeUpCommunicationInterface
+public class MadeUpClient extends Client18<MadeUpCommunicationInterface> implements MadeUpCommunicationInterface
 {
     private final StoreId storeIdToExpect;
     private final byte internalProtocolVersion;
 
     public MadeUpClient( int port, StoreId storeIdToExpect, byte internalProtocolVersion, byte applicationProtocolVersion )
     {
-        super( "localhost", port, StringLogger.DEV_NULL, Client.NO_STORE_ID_GETTER,
+        super( "localhost", port, StringLogger.DEV_NULL, Client18.NO_STORE_ID_GETTER,
                 MadeUpServer.FRAME_LENGTH, applicationProtocolVersion,
-                Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
-                Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT,
-                Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT );
+ Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT,
+                Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT );
         this.storeIdToExpect = storeIdToExpect;
         this.internalProtocolVersion = internalProtocolVersion;
     }
@@ -54,7 +54,7 @@ public class MadeUpClient extends Client<MadeUpCommunicationInterface> implement
     @Override
     public Response<Integer> multiply( final int value1, final int value2 )
     {
-        return sendRequest( MadeUpRequestType.MULTIPLY, SlaveContext.EMPTY, new Serializer()
+        return sendRequest( MadeUpRequestType.MULTIPLY, SlaveContext18.EMPTY, new Serializer()
         {
             @Override
             public void write( ChannelBuffer buffer, ByteBuffer readBuffer ) throws IOException
@@ -62,13 +62,13 @@ public class MadeUpClient extends Client<MadeUpCommunicationInterface> implement
                 buffer.writeInt( value1 );
                 buffer.writeInt( value2 );
             }
-        }, Protocol.INTEGER_DESERIALIZER );
+        }, Protocol18.INTEGER_DESERIALIZER );
     }
 
     @Override
     public Response<Void> streamSomeData( final MadeUpWriter writer, final int dataSize )
     {
-        return sendRequest( MadeUpRequestType.STREAM_SOME_DATA, SlaveContext.EMPTY, new Serializer()
+        return sendRequest( MadeUpRequestType.STREAM_SOME_DATA, SlaveContext18.EMPTY, new Serializer()
         {
             @Override
             public void write( ChannelBuffer buffer, ByteBuffer readBuffer ) throws IOException
@@ -90,7 +90,7 @@ public class MadeUpClient extends Client<MadeUpCommunicationInterface> implement
     @Override
     public Response<Integer> throwException( final String messageInException )
     {
-        return sendRequest( MadeUpRequestType.THROW_EXCEPTION, SlaveContext.EMPTY, new Serializer()
+        return sendRequest( MadeUpRequestType.THROW_EXCEPTION, SlaveContext18.EMPTY, new Serializer()
         {
             @Override
             public void write( ChannelBuffer buffer, ByteBuffer readBuffer ) throws IOException

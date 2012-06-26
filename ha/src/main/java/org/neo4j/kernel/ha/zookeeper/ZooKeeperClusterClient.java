@@ -20,24 +20,26 @@
 
 package org.neo4j.kernel.ha.zookeeper;
 
+import static org.neo4j.com.Server.DEFAULT_BACKUP_PORT;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
+
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.ZooKeeper;
-import org.neo4j.com.Client;
+import org.neo4j.com.Client18;
 import org.neo4j.helpers.Pair;
 import org.neo4j.kernel.configuration.ConfigurationDefaults;
 import org.neo4j.kernel.ha.ClusterClient;
 import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.Master;
+import org.neo4j.kernel.ha.MasterClientFactory;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.util.StringLogger;
-
-import static org.neo4j.com.Server.*;
 
 public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements ClusterClient
 {
@@ -67,18 +69,16 @@ public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements 
 
     public ZooKeeperClusterClient( String zooKeeperServers, String clusterName )
     {
-        this( zooKeeperServers, StringLogger.SYSTEM, clusterName,
-                Integer.parseInt( ConfigurationDefaults.getDefault( HaSettings.zk_session_timeout, HaSettings.class ) ));
+        this( zooKeeperServers, StringLogger.SYSTEM, clusterName, Integer.parseInt( ConfigurationDefaults.getDefault(
+                HaSettings.zk_session_timeout, HaSettings.class ) ), MasterClientFactory.DEFAULT_FACTORY );
     }
 
     public ZooKeeperClusterClient( String zooKeeperServers, StringLogger msgLog, String clusterName,
-            int sessionTimeout )
+            int sessionTimeout, MasterClientFactory factory )
     {
-        super( zooKeeperServers, Client.NO_STORE_ID_GETTER, msgLog,
-                Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
-                Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
-                Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT,
-                sessionTimeout );
+        super( zooKeeperServers, Client18.NO_STORE_ID_GETTER, msgLog, Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT, sessionTimeout, factory );
         this.clusterName = clusterName;
         try
         {

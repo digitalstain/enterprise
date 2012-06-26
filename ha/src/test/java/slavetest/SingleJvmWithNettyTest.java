@@ -51,7 +51,7 @@ import org.junit.Test;
 import org.neo4j.com.Client;
 import org.neo4j.com.Client.ConnectionLostHandler;
 import org.neo4j.com.ComException;
-import org.neo4j.com.Protocol;
+import org.neo4j.com.Protocol18;
 import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
@@ -108,7 +108,7 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
         config.put( "server_id", Integer.toString( id ) );
 
         final Machine masterMachine = new Machine( masterId, -1, 1, -1,
-                "localhost:" + Protocol.PORT );
+                "localhost:" + Protocol18.PORT );
         int readTimeout = getConfigInt( config, HaSettings.read_timeout.name(), TEST_READ_TIMEOUT );
         final Master client = new MasterClient(
                 masterMachine.getServer().first(),

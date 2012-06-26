@@ -62,6 +62,7 @@ import org.neo4j.kernel.ha.ClusterEventReceiver;
 import org.neo4j.kernel.ha.ConnectionInformation;
 import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.Master;
+import org.neo4j.kernel.ha.MasterClientFactory;
 import org.neo4j.kernel.ha.MasterImpl;
 import org.neo4j.kernel.ha.MasterServer;
 import org.neo4j.kernel.ha.SlaveDatabaseOperations;
@@ -103,14 +104,15 @@ public class ZooClient extends AbstractZooKeeperManager
     private final boolean allowCreateCluster;
 
     public ZooClient( String storeDir, StringLogger stringLogger, StoreIdGetter storeIdGetter, Config conf,
-            SlaveDatabaseOperations localDatabase, ClusterEventReceiver clusterReceiver )
+            SlaveDatabaseOperations localDatabase, ClusterEventReceiver clusterReceiver,
+            MasterClientFactory masterClientFactory )
     {
         super( conf.get( HaSettings.coordinators ),
             storeIdGetter, stringLogger,
             conf.getInteger( read_timeout ),
             conf.isSet( lock_read_timeout ) ? conf.getInteger( lock_read_timeout) : conf.getInteger( read_timeout ),
-            conf.getInteger( max_concurrent_channels_per_slave ),
-            conf.getInteger( zk_session_timeout ));
+                conf.getInteger( max_concurrent_channels_per_slave ), conf.getInteger( zk_session_timeout ),
+                masterClientFactory );
         this.storeDir = storeDir;
         this.conf = conf;
         this.localDatabase = localDatabase;
@@ -759,7 +761,7 @@ public class ZooClient extends AbstractZooKeeperManager
             implements Watcher
     {
         private final Queue<WatchedEvent> unprocessedEvents = new LinkedList<WatchedEvent>();
-        
+
         /**
          * Flush all events we go before initialization of ZooKeeper/WatcherImpl was completed.
          * @param zooKeeper ZooKeeper instance to use when processing. We cannot rely on the
@@ -776,7 +778,7 @@ public class ZooClient extends AbstractZooKeeperManager
                     processEvent( e, zooKeeper );
             }
         }
-        
+
         public void process( WatchedEvent event )
         {
             /*
@@ -784,7 +786,7 @@ public class ZooClient extends AbstractZooKeeperManager
              * this watcher which uses the ZooKeeper object that it's set to watch. And
              * it is passed in to the constructor of the ZooKeeper object. So, if this watcher
              * gets an event before the ZooKeeper constructor returns we're screwed here.
-             * 
+             *
              * Cue unprocessedEvents queue. It will act as a shield for this design blunder
              * and absorb the events we get before everything is properly initialized,
              * and emit them right thereafter (see #flushUnprocessedEvents()).
@@ -797,7 +799,7 @@ public class ZooClient extends AbstractZooKeeperManager
                     return;
                 }
             }
-            
+
             processEvent( event, zooKeeper );
         }
 

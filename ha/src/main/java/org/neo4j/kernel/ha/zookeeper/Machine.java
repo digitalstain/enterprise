@@ -19,13 +19,13 @@
  */
 package org.neo4j.kernel.ha.zookeeper;
 
-import org.neo4j.com.SlaveContext;
+import org.neo4j.com.SlaveContext18;
 import org.neo4j.helpers.Pair;
 
 public class Machine
 {
     public static final Machine NO_MACHINE = new Machine( -1, -1, 1,
-            SlaveContext.EMPTY.machineId(), null );
+ SlaveContext18.EMPTY.machineId(), null );
 
     private final int machineId;
     private final int sequenceId;

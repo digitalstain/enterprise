@@ -28,7 +28,6 @@ import java.util.Map;
 
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
-import org.neo4j.com.Client.ConnectionLostHandler;
 import org.neo4j.com.ComException;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
@@ -40,7 +39,7 @@ import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.ha.IdAllocation;
 import org.neo4j.kernel.ha.LockResult;
 import org.neo4j.kernel.ha.Master;
-import org.neo4j.kernel.ha.MasterClient;
+import org.neo4j.kernel.ha.MasterClientFactory;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.util.StringLogger;
 
@@ -64,9 +63,11 @@ public abstract class AbstractZooKeeperManager
     private final long sessionTimeout;
 
     private final StoreIdGetter storeIdGetter;
+    private final MasterClientFactory masterClientFactory;
 
     public AbstractZooKeeperManager( String servers, StoreIdGetter storeIdGetter, StringLogger msgLog,
-            int clientReadTimeout, int clientLockReadTimeout, int maxConcurrentChannelsPerSlave, int sessionTimeout )
+            int clientReadTimeout, int clientLockReadTimeout, int maxConcurrentChannelsPerSlave, int sessionTimeout,
+            MasterClientFactory masterClientFactory )
     {
         assert msgLog != null;
 
@@ -77,6 +78,7 @@ public abstract class AbstractZooKeeperManager
         this.maxConcurrentChannelsPerSlave = maxConcurrentChannelsPerSlave;
         this.clientReadTimeout = clientReadTimeout;
         this.sessionTimeout = sessionTimeout;
+        this.masterClientFactory = masterClientFactory;
     }
 
     protected String asRootPath( StoreId storeId )
@@ -193,9 +195,9 @@ public abstract class AbstractZooKeeperManager
         {
             return NO_MASTER;
         }
-        return new MasterClient( master.getServer().first(),
+        return masterClientFactory.instantiate( master.getServer().first(),
                 master.getServer().other(), this.msgLog, storeIdGetter,
-                ConnectionLostHandler.NO_ACTION, clientReadTimeout,
+                clientReadTimeout,
                 clientLockReadTimeout, maxConcurrentChannelsPerSlave );
     }
 

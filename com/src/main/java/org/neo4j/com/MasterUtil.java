@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+
 import org.neo4j.com.SlaveContext.Tx;
 import org.neo4j.graphdb.event.ErrorState;
 import org.neo4j.helpers.Exceptions;
@@ -87,7 +88,7 @@ public class MasterUtil
             return path.substring( 1 );
         return path;
     }
-    
+
     public static Tx[] rotateLogs( GraphDatabaseAPI graphDb )
     {
         XaDataSourceManager dsManager = graphDb.getXaDataSourceManager();
@@ -99,7 +100,8 @@ public class MasterUtil
         {
             try
             {
-                appliedTransactions[i++] = SlaveContext.lastAppliedTx( ds.getName(), ds.getXaContainer()
+                appliedTransactions[i++] = SlaveContext.Tx.lastAppliedTx( ds.getName(),
+                        ds.getXaContainer()
                     .getResourceManager()
                     .rotateLogicalLog() );
             }
@@ -123,7 +125,7 @@ public class MasterUtil
         File baseDir = getBaseDir( graphDb );
         XaDataSourceManager dsManager =
                 graphDb.getXaDataSourceManager();
-        SlaveContext context = SlaveContext.anonymous( rotateLogs( graphDb ) );
+        SlaveContext context = SlaveContext18.anonymous( rotateLogs( graphDb ) );
         ByteBuffer temporaryBuffer = ByteBuffer.allocateDirect( 1024*1024 );
         for ( XaDataSource ds : dsManager.getAllRegisteredDataSources() )
         {
@@ -158,7 +160,7 @@ public class MasterUtil
         }
         return context;
     }
-    
+
     /**
      * For a given {@link XaDataSource} it extracts the transaction stream from
      * startTxId up to endTxId (inclusive) in the provided {@link List} and
