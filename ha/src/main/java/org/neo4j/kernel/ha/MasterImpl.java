@@ -39,7 +39,6 @@ import javax.transaction.TransactionManager;
 import org.neo4j.com.MasterUtil;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
-import org.neo4j.com.SlaveContext18;
 import org.neo4j.com.StoreWriter;
 import org.neo4j.com.TxExtractor;
 import org.neo4j.graphdb.Node;
@@ -383,7 +382,7 @@ public class MasterImpl implements Master
         IdGenerator generator = graphDb.getIdGeneratorFactory().get( idType );
         IdAllocation result = new IdAllocation( generator.nextIdBatch( ID_GRAB_SIZE ), generator.getHighId(),
                 generator.getDefragCount() );
-        return MasterUtil.packResponseWithoutTransactionStream( graphDb, SlaveContext18.EMPTY, result );
+        return MasterUtil.packResponseWithoutTransactionStream( graphDb, SlaveContext.EMPTY, result );
     }
 
     public Response<Long> commitSingleResourceTransaction( SlaveContext context, String resource,
@@ -449,7 +448,7 @@ public class MasterImpl implements Master
         try
         {
             Pair<Integer, Long> masterId = nioneoDataSource.getMasterForCommittedTx( txId );
-            return MasterUtil.packResponseWithoutTransactionStream( graphDb, SlaveContext18.EMPTY, masterId );
+            return MasterUtil.packResponseWithoutTransactionStream( graphDb, SlaveContext.EMPTY, masterId );
         }
         catch ( IOException e )
         {

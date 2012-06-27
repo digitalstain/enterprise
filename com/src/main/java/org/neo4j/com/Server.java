@@ -66,7 +66,7 @@ import org.neo4j.kernel.impl.util.StringLogger;
  * {@link Client}). Delegates actual work to an instance of a specified communication
  * interface, injected in the constructor.
  */
-public abstract class Server<M, R> extends Protocol18 implements ChannelPipelineFactory
+public abstract class Server<M, R> extends Protocol implements ChannelPipelineFactory
 {
     static final byte INTERNAL_PROTOCOL_VERSION = 2;
     public static final int DEFAULT_BACKUP_PORT = 6362;
@@ -510,7 +510,7 @@ public abstract class Server<M, R> extends Protocol18 implements ChannelPipeline
         // Only perform checksum checks on the neo data source. If there's none in the request
         // then don't perform any such check.
         if ( neoTx != null ) txVerifier.assertMatch( neoTx.getTxId(), masterId, checksum );
-        return new SlaveContext18( sessionId, machineId, eventIdentifier, lastAppliedTransactions, masterId, checksum );
+        return new SlaveContext( sessionId, machineId, eventIdentifier, lastAppliedTransactions, masterId, checksum );
     }
 
     protected abstract RequestType<M> getRequestContext( byte id );
@@ -522,7 +522,7 @@ public abstract class Server<M, R> extends Protocol18 implements ChannelPipeline
         {
             // Checking for machineId -1 excludes the "empty" slave contexts
             // which some communication points pass in as context.
-            if ( slave != null && slave.machineId() != SlaveContext18.EMPTY.machineId() )
+            if ( slave != null && slave.machineId() != SlaveContext.EMPTY.machineId() )
             {
                 Pair<SlaveContext, AtomicLong> previous = connectedSlaveChannels.get( channel );
                 if ( previous != null )
