@@ -19,8 +19,17 @@
  */
 package org.neo4j.com;
 
-public interface SlaveContext
+import java.util.Arrays;
+
+/**
+ * A representation of the context in which an HA slave operates. Contains <li>
+ * the machine id</li> <li>a list of the last applied transaction id for each
+ * datasource</li> <li>an event identifier, the txid of the most recent local
+ * top level tx</li> <li>a session id, the startup time of the database</li>
+ */
+public final class SlaveContext
 {
+
     public static class Tx
     {
         private final String dataSourceName;
@@ -54,16 +63,90 @@ public interface SlaveContext
         }
     }
 
-    public int machineId();
+    private final int machineId;
+    private final Tx[] lastAppliedTransactions;
+    private final int eventIdentifier;
+    private final int hashCode;
+    private final long sessionId;
+    private final int masterId;
+    private final long checksum;
 
-    public Tx[] lastAppliedTransactions();
+    public SlaveContext( long sessionId, int machineId, int eventIdentifier, Tx[] lastAppliedTransactions,
+            int masterId, long checksum )
+    {
+        this.sessionId = sessionId;
+        this.machineId = machineId;
+        this.eventIdentifier = eventIdentifier;
+        this.lastAppliedTransactions = lastAppliedTransactions;
+        this.masterId = masterId;
+        this.checksum = checksum;
 
-    public int getEventIdentifier();
+        long hash = sessionId;
+        hash = ( 31 * hash ) ^ eventIdentifier;
+        hash = ( 31 * hash ) ^ machineId;
+        this.hashCode = (int) ( ( hash >>> 32 ) ^ hash );
+    }
 
-    public long getSessionId();
+    public int machineId()
+    {
+        return machineId;
+    }
 
-    public int getMasterId();
+    public Tx[] lastAppliedTransactions()
+    {
+        return lastAppliedTransactions;
+    }
 
-    public long getChecksum();
+    public int getEventIdentifier()
+    {
+        return eventIdentifier;
+    }
 
+    public long getSessionId()
+    {
+        return sessionId;
+    }
+
+    public int getMasterId()
+    {
+        return masterId;
+    }
+
+    public long getChecksum()
+    {
+        return checksum;
+    }
+
+    @Override
+    public String toString()
+    {
+        return "SlaveContext[session: " + sessionId + ", ID:" + machineId + ", eventIdentifier:" + eventIdentifier
+               + ", " + Arrays.asList( lastAppliedTransactions ) + "]";
+    }
+
+    @Override
+    public boolean equals( Object obj )
+    {
+        if ( !( obj instanceof SlaveContext ) )
+        {
+            return false;
+        }
+        SlaveContext o = (SlaveContext) obj;
+        return o.eventIdentifier == eventIdentifier && o.machineId == machineId && o.sessionId == sessionId;
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return this.hashCode;
+    }
+
+    public static SlaveContext EMPTY = new SlaveContext( -1, -1, -1, new Tx[0], -1, -1 );
+
+    public static SlaveContext anonymous( Tx[] lastAppliedTransactions )
+    {
+        SlaveContext castedEmpty = EMPTY;
+        return new SlaveContext( castedEmpty.sessionId, castedEmpty.machineId, castedEmpty.eventIdentifier,
+                lastAppliedTransactions, castedEmpty.masterId, castedEmpty.checksum );
+    }
 }

@@ -53,7 +53,7 @@ public class MadeUpClient extends Client18<MadeUpCommunicationInterface> impleme
     @Override
     public Response<Integer> multiply( final int value1, final int value2 )
     {
-        return sendRequest( MadeUpRequestType.MULTIPLY, SlaveContext18.EMPTY, new Serializer()
+        return sendRequest( MadeUpRequestType.MULTIPLY, SlaveContext.EMPTY, new Serializer()
         {
             @Override
             public void write( ChannelBuffer buffer, ByteBuffer readBuffer ) throws IOException
@@ -61,7 +61,7 @@ public class MadeUpClient extends Client18<MadeUpCommunicationInterface> impleme
                 buffer.writeInt( value1 );
                 buffer.writeInt( value2 );
             }
-        }, Protocol18.INTEGER_DESERIALIZER );
+        }, Protocol.INTEGER_DESERIALIZER );
     }
 
     private SlaveContext context()
@@ -72,7 +72,7 @@ public class MadeUpClient extends Client18<MadeUpCommunicationInterface> impleme
     @Override
     public Response<Void> streamSomeData( final MadeUpWriter writer, final int dataSize )
     {
-        return sendRequest( MadeUpRequestType.STREAM_SOME_DATA, SlaveContext18.EMPTY, new Serializer()
+        return sendRequest( MadeUpRequestType.STREAM_SOME_DATA, SlaveContext.EMPTY, new Serializer()
         {
             @Override
             public void write( ChannelBuffer buffer, ByteBuffer readBuffer ) throws IOException
@@ -94,7 +94,7 @@ public class MadeUpClient extends Client18<MadeUpCommunicationInterface> impleme
     @Override
     public Response<Integer> throwException( final String messageInException )
     {
-        return sendRequest( MadeUpRequestType.THROW_EXCEPTION, SlaveContext18.EMPTY, new Serializer()
+        return sendRequest( MadeUpRequestType.THROW_EXCEPTION, SlaveContext.EMPTY, new Serializer()
         {
             @Override
             public void write( ChannelBuffer buffer, ByteBuffer readBuffer ) throws IOException

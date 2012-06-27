@@ -29,7 +29,8 @@ import java.nio.ByteBuffer;
 
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.neo4j.com.BlockLogBuffer;
-import org.neo4j.com.Client;
+import org.neo4j.com.Client15;
+import org.neo4j.com.ConnectionLostHandler;
 import org.neo4j.com.Deserializer;
 import org.neo4j.com.MasterCaller;
 import org.neo4j.com.ObjectSerializer;
@@ -55,7 +56,7 @@ import org.neo4j.kernel.impl.util.StringLogger;
  * {@link MasterServer} (which delegates to {@link MasterImpl} on the master
  * side.
  */
-public class MasterClient153 extends Client<Master> implements Master, MasterClient
+public class MasterClient153 extends Client15<Master> implements Master, MasterClient
 {
     static final ObjectSerializer<LockResult> LOCK_SERIALIZER = new ObjectSerializer<LockResult>()
     {

@@ -122,7 +122,7 @@ public class MasterUtil
         File baseDir = getBaseDir( graphDb );
         XaDataSourceManager dsManager =
                 graphDb.getXaDataSourceManager();
-        SlaveContext context = SlaveContext18.anonymous( rotateLogs( graphDb ) );
+        SlaveContext context = SlaveContext.anonymous( rotateLogs( graphDb ) );
         ByteBuffer temporaryBuffer = ByteBuffer.allocateDirect( 1024*1024 );
         for ( XaDataSource ds : dsManager.getAllRegisteredDataSources() )
         {

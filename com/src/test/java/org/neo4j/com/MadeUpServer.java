@@ -19,6 +19,8 @@
  */
 package org.neo4j.com;
 
+import static org.neo4j.com.Protocol.readString;
+
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.Channel;
 import org.neo4j.kernel.impl.util.StringLogger;
@@ -113,7 +115,7 @@ public class MadeUpServer extends Server<MadeUpCommunicationInterface, Void>
                 int value2 = input.readInt();
                 return master.multiply( value1, value2 );
             }
-        }, Protocol18.INTEGER_SERIALIZER ),
+        }, Protocol.INTEGER_SERIALIZER ),
 
         STREAM_SOME_DATA( new MasterCaller<MadeUpCommunicationInterface, Void>()
         {
@@ -124,7 +126,7 @@ public class MadeUpServer extends Server<MadeUpCommunicationInterface, Void>
                 int dataSize = input.readInt();
                 return master.streamSomeData( new ToChannelBufferWriter( target ), dataSize );
             }
-        }, Protocol18.VOID_SERIALIZER ),
+        }, Protocol.VOID_SERIALIZER ),
 
         THROW_EXCEPTION( new MasterCaller<MadeUpCommunicationInterface, Integer>()
         {
@@ -134,7 +136,7 @@ public class MadeUpServer extends Server<MadeUpCommunicationInterface, Void>
             {
                 return master.throwException( readString( input ) );
             }
-        }, Protocol18.VOID_SERIALIZER );
+        }, Protocol.VOID_SERIALIZER );
 
         private final MasterCaller masterCaller;
         private final ObjectSerializer serializer;

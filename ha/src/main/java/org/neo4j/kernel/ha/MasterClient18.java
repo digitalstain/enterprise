@@ -19,25 +19,25 @@
  */
 package org.neo4j.kernel.ha;
 
-import static org.neo4j.com.Protocol18.EMPTY_SERIALIZER;
-import static org.neo4j.com.Protocol18.VOID_DESERIALIZER;
-import static org.neo4j.com.Protocol18.writeString;
+import static org.neo4j.com.Protocol.EMPTY_SERIALIZER;
+import static org.neo4j.com.Protocol.VOID_DESERIALIZER;
+import static org.neo4j.com.Protocol.writeString;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.jboss.netty.buffer.ChannelBuffer;
+import org.neo4j.com.ConnectionLostHandler;
 import org.neo4j.com.BlockLogBuffer;
 import org.neo4j.com.Client18;
 import org.neo4j.com.Deserializer;
 import org.neo4j.com.MasterCaller;
-import org.neo4j.com.Protocol18;
+import org.neo4j.com.Protocol;
 import org.neo4j.com.RequestType;
 import org.neo4j.com.ResourceReleaser;
 import org.neo4j.com.Response;
 import org.neo4j.com.Serializer;
 import org.neo4j.com.SlaveContext;
-import org.neo4j.com.SlaveContext18;
 import org.neo4j.com.StoreIdGetter;
 import org.neo4j.com.StoreWriter;
 import org.neo4j.com.TransactionStream;
@@ -59,7 +59,7 @@ public class MasterClient18 extends Client18<Master> implements MasterClient
 
     private final int lockReadTimeout;
 
-    public MasterClient18( String hostNameOrIp, int port, StringLogger stringLogger, StoreIdGetter storeIdGetter,ConnectionLostHandler connectionLostHandler,
+    public MasterClient18( String hostNameOrIp, int port, StringLogger stringLogger, StoreIdGetter storeIdGetter, ConnectionLostHandler connectionLostHandler,
             int readTimeoutSeconds, int lockReadTimeout, int maxConcurrentChannels )
     {
         super( hostNameOrIp, port, stringLogger, storeIdGetter,
@@ -83,7 +83,7 @@ public class MasterClient18 extends Client18<Master> implements MasterClient
     @Override
     public Response<IdAllocation> allocateIds( final IdType idType )
     {
-        return sendRequest( HaRequestType18.ALLOCATE_IDS, SlaveContext18.EMPTY, new Serializer()
+        return sendRequest( HaRequestType18.ALLOCATE_IDS, SlaveContext.EMPTY, new Serializer()
         {
             public void write( ChannelBuffer buffer, ByteBuffer readBuffer ) throws IOException
             {
@@ -252,7 +252,7 @@ public class MasterClient18 extends Client18<Master> implements MasterClient
     @Override
     public Response<Pair<Integer,Long>> getMasterIdForCommittedTx( final long txId, StoreId storeId )
     {
-        return sendRequest( HaRequestType18.GET_MASTER_ID_FOR_TX, SlaveContext18.EMPTY, new Serializer()
+        return sendRequest( HaRequestType18.GET_MASTER_ID_FOR_TX, SlaveContext.EMPTY, new Serializer()
         {
             public void write( ChannelBuffer buffer, ByteBuffer readBuffer ) throws IOException
             {
@@ -273,12 +273,12 @@ public class MasterClient18 extends Client18<Master> implements MasterClient
     {
         context = stripFromTransactions( context );
         return sendRequest( HaRequestType18.COPY_STORE, context, EMPTY_SERIALIZER,
-                new Protocol18.FileStreamsDeserializer( writer ) );
+                new Protocol.FileStreamsDeserializer( writer ) );
     }
 
     private SlaveContext stripFromTransactions( SlaveContext context )
     {
-        return new SlaveContext18( context.getSessionId(), context.machineId(),
+        return new SlaveContext( context.getSessionId(), context.machineId(),
                 context.getEventIdentifier(), new SlaveContext.Tx[0], context.getMasterId(), context.getChecksum() );
     }
 

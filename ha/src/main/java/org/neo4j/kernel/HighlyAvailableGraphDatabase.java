@@ -47,7 +47,6 @@ import org.neo4j.com.MasterUtil;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
 import org.neo4j.com.SlaveContext.Tx;
-import org.neo4j.com.SlaveContext18;
 import org.neo4j.com.ToFileStoreWriter;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
@@ -74,6 +73,7 @@ import org.neo4j.kernel.ha.ClusterEventReceiver;
 import org.neo4j.kernel.ha.HaCaches;
 import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.Master;
+import org.neo4j.kernel.ha.MasterClientFactory;
 import org.neo4j.kernel.ha.MasterGraphDatabase;
 import org.neo4j.kernel.ha.MasterServer;
 import org.neo4j.kernel.ha.SlaveDatabaseOperations;
@@ -770,7 +770,7 @@ public class HighlyAvailableGraphDatabase
 
     private SlaveContext emptyContext()
     {
-        return new SlaveContext18( 0, machineId, 0, new Tx[0], 0, 0 );
+        return new SlaveContext( 0, machineId, 0, new Tx[0], 0, 0 );
     }
 
     private long highestLogVersion( String targetStoreDir )
@@ -1508,8 +1508,8 @@ public class HighlyAvailableGraphDatabase
             @Override
             public ZooClient newZooClient()
             {
-                return new ZooClient( storeDir, messageLog, configuration, /* as SlaveDatabaseOperations for extracting master for tx */
-                        slaveOperations, /* as ClusterEventReceiver */slaveOperations );
+                        return new ZooClient( storeDir, messageLog, storeIdGetter, configuration, /* as SlaveDatabaseOperations for extracting master for tx */
+                        slaveOperations, /* as ClusterEventReceiver */slaveOperations, MasterClientFactory.F18 );
             }
         } );
     }
@@ -1524,7 +1524,7 @@ public class HighlyAvailableGraphDatabase
         return new ZooKeeperClusterClient(
                 configuration.get( HaSettings.coordinators ), getMessageLog(),
                 configuration.get( HaSettings.cluster_name ),
-                configuration.getInteger( HaSettings.zk_session_timeout ));
+                configuration.getInteger( HaSettings.zk_session_timeout ), MasterClientFactory.F18);
     }
 
     // TODO This should be removed. Analyze usages
@@ -1703,7 +1703,7 @@ public class HighlyAvailableGraphDatabase
                     {
                         master = dataSource.getMasterForCommittedTx( txId );
                     }
-                    txs[i++] = SlaveContext.lastAppliedTx( dataSource.getName(), txId );
+                    txs[i++] = SlaveContext.Tx.lastAppliedTx( dataSource.getName(), txId );
                 }
                 return new SlaveContext( startupTime, machineId, eventIdentifier, txs, master.first(), master.other() );
             }

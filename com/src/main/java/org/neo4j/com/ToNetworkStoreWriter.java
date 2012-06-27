@@ -33,13 +33,13 @@ public class ToNetworkStoreWriter implements StoreWriter
     {
         this.targetBuffer = targetBuffer;
     }
-    
+
     public void write( String path, ReadableByteChannel data, ByteBuffer temporaryBuffer,
             boolean hasData ) throws IOException
     {
         char[] chars = path.toCharArray();
         targetBuffer.writeShort( chars.length );
-        Protocol18.writeChars( targetBuffer, chars );
+        Protocol.writeChars( targetBuffer, chars );
         targetBuffer.writeByte( hasData ? 1 : 0 );
         // TODO Make use of temporaryBuffer?
         BlockLogBuffer buffer = new BlockLogBuffer( targetBuffer );
