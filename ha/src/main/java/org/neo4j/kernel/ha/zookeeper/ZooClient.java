@@ -78,6 +78,7 @@ public class ZooClient extends AbstractZooKeeperManager
 {
     static final String MASTER_NOTIFY_CHILD = "master-notify";
     static final String MASTER_REBOUND_CHILD = "master-rebound";
+    static final String COMPATIBILITY_CHILD = "compatibility-node";
 
     private final ZooKeeper zooKeeper;
     private final int machineId;
@@ -649,42 +650,38 @@ public class ZooClient extends AbstractZooKeeperManager
 
     private void startFlushing()
     {
-        if ( !flushing )
+        if ( checkCompatibilityNodeExists() )
+        {
+            msgLog.logMessage( "Discovered compatibility node, will remain in compatibility mode until the node is removed" );
+            updater = new CompatibilitySlaveOnlyTxIdUpdater();
+            updater.init();
+        }
+        else if ( !flushing )
         {
             synchronized ( this )
             {
                 flushing = true;
                 updater = new SynchronousTxIdUpdater();
                 updater.init();
-                // /*
-                // * This is here so we call getFirstMasterForTx() on the same
-                // * txid that we post - not strictly required since
-                // setCommitedTxId()
-                // * is synchronized, which means we can't have committedTx
-                // changed while
-                // * we are here.
-                // */
-                // long txNow = committedTx;
-                // writeData( txNow, getFirstMasterForTx( txNow ) );
-                // msgLog.logMessage(
-                // "Starting flushing of txids to zk, while at txid " + txNow );
             }
         }
     }
 
     private void stopFlushing()
     {
-        if ( flushing )
+        if ( checkCompatibilityNodeExists() )
+        {
+            msgLog.logMessage( "Discovered compatibility node, will remain in compatibility mode until the node is removed" );
+            updater = new CompatibilitySlaveOnlyTxIdUpdater();
+            updater.init();
+        }
+        else if ( flushing )
         {
             synchronized ( this )
             {
                 flushing = false;
                 updater = new NoUpdateTxIdUpdater();
                 updater.init();
-                // writeData( -2, -2 );
-                // msgLog.logMessage(
-                // "Stopping flushing of txids to zk, while at txid " +
-                // committedTx );
             }
         }
     }
@@ -693,11 +690,6 @@ public class ZooClient extends AbstractZooKeeperManager
     {
         this.committedTx = tx;
         updater.updatedTxId( tx );
-        // if ( flushing )
-        // {
-        // masterForCommittedTx = localDatabase.getMasterForTx( tx );
-        // writeData( tx, masterForCommittedTx );
-        // }
     }
 
     private void writeData( long tx, int masterForThat )
@@ -774,6 +766,19 @@ public class ZooClient extends AbstractZooKeeperManager
     protected String getHaServer( int machineId, boolean wait )
     {
         return machineId == this.machineId ? haServer : super.getHaServer( machineId, wait );
+    }
+
+    private boolean checkCompatibilityNodeExists()
+    {
+        try
+        {
+            return zooKeeper.exists( getRoot() + "/" + COMPATIBILITY_CHILD, false ) != null;
+        }
+        catch ( Exception e )
+        {
+            msgLog.logMessage( "Tried to discover if compatibility node exists, got this exception instead", e );
+            throw new RuntimeException( e );
+        }
     }
 
     private synchronized StoreId createCluster( StoreId storeIdSuggestion )
@@ -950,6 +955,11 @@ public class ZooClient extends AbstractZooKeeperManager
                             subscribeToDataChangeWatcher( MASTER_REBOUND_CHILD );
                         }
                         keeperState = KeeperState.SyncConnected;
+                        if ( checkCompatibilityNodeExists() )
+                        {
+                            msgLog.logMessage( "Discovered compatibility node, will remain in compatibility mode until the node is removed" );
+                            updater = new CompatibilitySlaveOnlyTxIdUpdater();
+                        }
                     }
                     else
                     {
@@ -1048,20 +1058,27 @@ public class ZooClient extends AbstractZooKeeperManager
         }
     }
 
-    private class SynchronousTxIdUpdater implements TxIdUpdater
+    private abstract class AbstractTxIdUpdater implements TxIdUpdater
     {
         @Override
+        public void updatedTxId( long txId )
+        {
+            // default no op
+        }
+    }
+
+    private class SynchronousTxIdUpdater extends AbstractTxIdUpdater
+    {
         public void init()
         {
             /*
-             * txNow is here so we call getFirstMasterForTx() on the same
-             * txid that we post - not strictly required since setCommitedTxId()
-             * is synchronized, which means we can't have committedTx changed while
+             * this is safe because we call getFirstMasterForTx() on the same
+             * txid that we post - and we are supposed to be called from setCommitedTxId()
+             * which is synchronized, which means we can't have committedTx changed while
              * we are here.
              */
-            long txNow = committedTx;
-            writeData( txNow, getFirstMasterForTx( txNow ) );
-            msgLog.logMessage( "Starting flushing of txids to zk, while at txid " + txNow );
+            writeData( committedTx, getFirstMasterForTx( committedTx ) );
+            msgLog.logMessage( "Starting flushing of txids to zk, while at txid " + committedTx );
         }
 
         @Override
@@ -1072,35 +1089,22 @@ public class ZooClient extends AbstractZooKeeperManager
         }
     }
 
-    private class NoUpdateTxIdUpdater implements TxIdUpdater
+    private class NoUpdateTxIdUpdater extends AbstractTxIdUpdater
     {
         @Override
         public void init()
         {
             writeData( -2, -2 );
             msgLog.logMessage( "Stopping flushing of txids to zk, while at txid " + committedTx );
-        }
-
-        @Override
-        public void updatedTxId( long txId )
-        {
-            // No op, as it says on the box
         }
     }
 
-    private class CompatibilitySlaveOnlyTxIdUpdater implements TxIdUpdater
+    private class CompatibilitySlaveOnlyTxIdUpdater extends AbstractTxIdUpdater
     {
-        @Override
         public void init()
         {
-            writeData( -2, -2 );
+            writeData( 0, -1 );
             msgLog.logMessage( "Stopping flushing of txids to zk, while at txid " + committedTx );
-        }
-
-        @Override
-        public void updatedTxId( long txId )
-        {
-            // No op, this is slave mode essentially
         }
     }
 }
