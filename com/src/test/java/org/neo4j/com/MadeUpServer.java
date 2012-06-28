@@ -38,13 +38,13 @@ public class MadeUpServer extends Server<MadeUpCommunicationInterface, Void>
     {
         this( realMaster, port, internalProtocolVersion, applicationProtocolVersion, txVerifier, null, null );
     }
-    
+
     public MadeUpServer( MadeUpCommunicationInterface realMaster, int port, byte internalProtocolVersion,
             byte applicationProtocolVersion, TxChecksumVerifier txVerifier, Byte internalProtocolVersionInResponse,
             Byte applicationProtocolVersionInResponse )
     {
         super( realMaster, port, StringLogger.DEV_NULL, FRAME_LENGTH, applicationProtocolVersion,
-                DEFAULT_MAX_NUMBER_OF_CONCURRENT_TRANSACTIONS, Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                DEFAULT_MAX_NUMBER_OF_CONCURRENT_TRANSACTIONS, Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
                 txVerifier );
         this.internalProtocolVersion = internalProtocolVersion;
         this.appProtocolVersion = applicationProtocolVersion;
@@ -79,7 +79,7 @@ public class MadeUpServer extends Server<MadeUpCommunicationInterface, Void>
                 internalProtocolVersionInResponse != null ? internalProtocolVersionInResponse : internalProtocolVersion,
                 applicationProtocolVersionInResponse != null ? applicationProtocolVersionInResponse : appProtocolVersion );
     }
-    
+
     @Override
     protected RequestType<MadeUpCommunicationInterface> getRequestContext( byte id )
     {

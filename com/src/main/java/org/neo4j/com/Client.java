@@ -56,7 +56,7 @@ import org.neo4j.kernel.impl.util.StringLogger;
  * serializes requests and sends them to the server and waits for
  * a response back.
  */
-public abstract class Client18<M> implements ChannelPipelineFactory
+public abstract class Client<M> implements ChannelPipelineFactory
 {
     // Max number of concurrent channels that may exist. Needs to be high because we
     // don't want to run into that limit, it will make some #acquire calls block and
@@ -77,7 +77,7 @@ public abstract class Client18<M> implements ChannelPipelineFactory
     private final ResourceReleaser resourcePoolReleaser;
     private final List<MismatchingVersionHandler> mismatchingVersionHandlers;
 
-    public Client18( String hostNameOrIp, int port, StringLogger logger,
+    public Client( String hostNameOrIp, int port, StringLogger logger,
             StoreId storeId, int frameLength, byte applicationProtocolVersion, int readTimeout,
             int maxConcurrentChannels, int maxUnusedPoolSize )
     {
@@ -86,7 +86,7 @@ public abstract class Client18<M> implements ChannelPipelineFactory
                 maxUnusedPoolSize, ConnectionLostHandler.NO_ACTION );
     }
 
-    public Client18( String hostNameOrIp, int port, StringLogger logger,
+    public Client( String hostNameOrIp, int port, StringLogger logger,
             StoreId storeId, int frameLength,
             byte applicationProtocolVersion, int readTimeout,
             int maxConcurrentChannels, int maxUnusedPoolSize,

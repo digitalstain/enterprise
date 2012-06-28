@@ -363,7 +363,7 @@ public class OnlineBackup
                 diff = Long.valueOf( 0L );
             }
             long newTxId = originalTxId + diff;
-            newTxs[i] = SlaveContext.lastAppliedTx( dsName, newTxId );
+            newTxs[i] = SlaveContext.Tx.lastAppliedTx( dsName, newTxId );
         }
         return SlaveContext.anonymous( newTxs );
     }
@@ -472,7 +472,7 @@ public class OnlineBackup
         List<Tx> txs = new ArrayList<Tx>();
         for ( XaDataSource ds : dsManager.getAllRegisteredDataSources() )
         {
-            txs.add( SlaveContext.lastAppliedTx( ds.getName(), ds.getLastCommittedTxId() ) );
+            txs.add( SlaveContext.Tx.lastAppliedTx( ds.getName(), ds.getLastCommittedTxId() ) );
         }
         return SlaveContext.anonymous( txs.toArray( new Tx[0] ) );
     }

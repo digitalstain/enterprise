@@ -42,7 +42,7 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
-import org.neo4j.com.Client18;
+import org.neo4j.com.Client;
 import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -686,7 +686,7 @@ public abstract class AbstractHaTest
     {
         initializeDbs( 1 );
         List<WorkerThread> jobs = new LinkedList<WorkerThread>();
-        for ( int i = 0; i < Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT; i++ )
+        for ( int i = 0; i < Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT; i++ )
         {
             WorkerThread job = new WorkerThread( this );
             jobs.add( job );

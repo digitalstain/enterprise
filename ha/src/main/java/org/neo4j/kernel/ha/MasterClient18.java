@@ -28,7 +28,7 @@ import java.nio.ByteBuffer;
 
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.neo4j.com.BlockLogBuffer;
-import org.neo4j.com.Client18;
+import org.neo4j.com.Client;
 import org.neo4j.com.ConnectionLostHandler;
 import org.neo4j.com.Deserializer;
 import org.neo4j.com.MasterCaller;
@@ -53,7 +53,7 @@ import org.neo4j.kernel.impl.util.StringLogger;
  * {@link MasterServer} (which delegates to {@link MasterImpl}
  * on the master side.
  */
-public class MasterClient18 extends Client18<Master> implements MasterClient
+public class MasterClient18 extends Client<Master> implements MasterClient
 {
     /* Version 1 first version
      * Version 2 since 2012-01-24

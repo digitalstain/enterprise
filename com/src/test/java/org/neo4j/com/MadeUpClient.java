@@ -31,16 +31,16 @@ import org.neo4j.com.MadeUpServer.MadeUpRequestType;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.util.StringLogger;
 
-public class MadeUpClient extends Client18<MadeUpCommunicationInterface> implements MadeUpCommunicationInterface
+public class MadeUpClient extends Client<MadeUpCommunicationInterface> implements MadeUpCommunicationInterface
 {
     private final byte internalProtocolVersion;
 
     public MadeUpClient( int port, StoreId storeIdToExpect, byte internalProtocolVersion, byte applicationProtocolVersion )
     {
         super( "localhost", port, StringLogger.DEV_NULL, storeIdToExpect, MadeUpServer.FRAME_LENGTH,
-                applicationProtocolVersion, Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
-                Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT,
-                Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT );
+                applicationProtocolVersion, Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT,
+                Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT );
         this.internalProtocolVersion = internalProtocolVersion;
     }
 

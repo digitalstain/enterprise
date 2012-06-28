@@ -92,6 +92,7 @@ public class ZooClient extends AbstractZooKeeperManager
     private volatile boolean flushing = false;
     private String rootPath;
     private volatile StoreId storeId;
+    private volatile TxIdUpdater updater = new NoUpdateTxIdUpdater();
 
     // Has the format <host-name>:<port>
     private final String haServer;
@@ -173,7 +174,7 @@ public class ZooClient extends AbstractZooKeeperManager
                 conf.getInteger( max_concurrent_channels_per_slave ),
                 clientLockReadTimeout, new BranchDetectingTxVerifier( graphDb ) );
     }
-    
+
     @Override
     protected StoreId getStoreId()
     {
@@ -652,16 +653,21 @@ public class ZooClient extends AbstractZooKeeperManager
         {
             synchronized ( this )
             {
-                /*
-                 * This is here so we call getFirstMasterForTx() on the same
-                 * txid that we post - not strictly required since setCommitedTxId()
-                 * is synchronized, which means we can't have committedTx changed while
-                 * we are here.
-                 */
-                long txNow = committedTx;
                 flushing = true;
-                writeData( txNow, getFirstMasterForTx( txNow ) );
-                msgLog.logMessage( "Starting flushing of txids to zk, while at txid " + txNow );
+                updater = new SynchronousTxIdUpdater();
+                updater.init();
+                // /*
+                // * This is here so we call getFirstMasterForTx() on the same
+                // * txid that we post - not strictly required since
+                // setCommitedTxId()
+                // * is synchronized, which means we can't have committedTx
+                // changed while
+                // * we are here.
+                // */
+                // long txNow = committedTx;
+                // writeData( txNow, getFirstMasterForTx( txNow ) );
+                // msgLog.logMessage(
+                // "Starting flushing of txids to zk, while at txid " + txNow );
             }
         }
     }
@@ -673,8 +679,12 @@ public class ZooClient extends AbstractZooKeeperManager
             synchronized ( this )
             {
                 flushing = false;
-                writeData( -2, -2 );
-                msgLog.logMessage( "Stopping flushing of txids to zk, while at txid " + committedTx );
+                updater = new NoUpdateTxIdUpdater();
+                updater.init();
+                // writeData( -2, -2 );
+                // msgLog.logMessage(
+                // "Stopping flushing of txids to zk, while at txid " +
+                // committedTx );
             }
         }
     }
@@ -682,11 +692,12 @@ public class ZooClient extends AbstractZooKeeperManager
     public synchronized void setCommittedTx( long tx )
     {
         this.committedTx = tx;
-        if ( flushing )
-        {
-            masterForCommittedTx = localDatabase.getMasterForTx( tx );
-            writeData( tx, masterForCommittedTx );
-        }
+        updater.updatedTxId( tx );
+        // if ( flushing )
+        // {
+        // masterForCommittedTx = localDatabase.getMasterForTx( tx );
+        // writeData( tx, masterForCommittedTx );
+        // }
     }
 
     private void writeData( long tx, int masterForThat )
@@ -1034,6 +1045,62 @@ public class ZooClient extends AbstractZooKeeperManager
                 msgLog.flush();
                 count.decrementAndGet();
             }
+        }
+    }
+
+    private class SynchronousTxIdUpdater implements TxIdUpdater
+    {
+        @Override
+        public void init()
+        {
+            /*
+             * txNow is here so we call getFirstMasterForTx() on the same
+             * txid that we post - not strictly required since setCommitedTxId()
+             * is synchronized, which means we can't have committedTx changed while
+             * we are here.
+             */
+            long txNow = committedTx;
+            writeData( txNow, getFirstMasterForTx( txNow ) );
+            msgLog.logMessage( "Starting flushing of txids to zk, while at txid " + txNow );
+        }
+
+        @Override
+        public void updatedTxId( long txId )
+        {
+            masterForCommittedTx = localDatabase.getMasterForTx( txId );
+            writeData( txId, masterForCommittedTx );
+        }
+    }
+
+    private class NoUpdateTxIdUpdater implements TxIdUpdater
+    {
+        @Override
+        public void init()
+        {
+            writeData( -2, -2 );
+            msgLog.logMessage( "Stopping flushing of txids to zk, while at txid " + committedTx );
+        }
+
+        @Override
+        public void updatedTxId( long txId )
+        {
+            // No op, as it says on the box
+        }
+    }
+
+    private class CompatibilitySlaveOnlyTxIdUpdater implements TxIdUpdater
+    {
+        @Override
+        public void init()
+        {
+            writeData( -2, -2 );
+            msgLog.logMessage( "Stopping flushing of txids to zk, while at txid " + committedTx );
+        }
+
+        @Override
+        public void updatedTxId( long txId )
+        {
+            // No op, this is slave mode essentially
         }
     }
 }

@@ -19,7 +19,7 @@
  */
 package org.neo4j.kernel.ha;
 
-import org.neo4j.com.Client18;
+import org.neo4j.com.Client;
 import org.neo4j.com.ConnectionLostHandler;
 import org.neo4j.com.Protocol;
 import org.neo4j.helpers.Pair;
@@ -41,8 +41,8 @@ public class FakeSlaveBroker extends AbstractBroker
     public FakeSlaveBroker( StringLogger log, int masterMachineId, Config config )
     {
         this( new MasterClient18( "localhost", Protocol.PORT, log, storeId, ConnectionLostHandler.NO_ACTION,
-                Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS, Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
-                Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT ), masterMachineId, config );
+                Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS, Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT ), masterMachineId, config );
     }
 
     public Pair<Master, Machine> getMaster()

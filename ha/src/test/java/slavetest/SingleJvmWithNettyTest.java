@@ -48,7 +48,7 @@ import java.util.concurrent.Future;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.neo4j.com.Client18;
+import org.neo4j.com.Client;
 import org.neo4j.com.ComException;
 import org.neo4j.com.ConnectionLostHandler;
 import org.neo4j.com.Protocol;
@@ -117,7 +117,7 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
                 AbstractBroker.storeId,
                 ConnectionLostHandler.NO_ACTION,
                 readTimeout, getConfigInt( config, HaSettings.lock_read_timeout.name(), readTimeout ),
-                Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT );
+                Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT );
         return new AbstractBroker( new Config( new ConfigurationDefaults(GraphDatabaseSettings.class, HaSettings.class ).apply( config ) ))
         {
             public boolean iAmMaster()
@@ -474,7 +474,7 @@ public class SingleJvmWithNettyTest extends SingleJvmTest
         // Asserting time spent in a unit test is error prone. Comparing lockTimeout=1
         // against the default (20) / 2 = 10 should be pretty fine and should still verify
         // the correct behavior.
-        assertTrue( "" + waitTime, waitTime < Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS * 1000 / 2 );
+        assertTrue( "" + waitTime, waitTime < Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS * 1000 / 2 );
         latch.countDownSecond();
     }
 

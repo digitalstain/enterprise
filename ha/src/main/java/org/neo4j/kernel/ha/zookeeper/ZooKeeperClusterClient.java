@@ -31,7 +31,7 @@ import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.ZooKeeper;
-import org.neo4j.com.Client18;
+import org.neo4j.com.Client;
 import org.neo4j.helpers.Pair;
 import org.neo4j.kernel.configuration.ConfigurationDefaults;
 import org.neo4j.kernel.ha.ClusterClient;
@@ -65,10 +65,9 @@ public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements 
     public ZooKeeperClusterClient( String zooKeeperServers, StringLogger msgLog, String clusterName,
             int sessionTimeout, MasterClientFactory factory )
     {
-        super( zooKeeperServers, msgLog,
-                Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
-                Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
-                Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT, sessionTimeout, factory );
+        super( zooKeeperServers, msgLog, Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT, sessionTimeout, factory );
         this.clusterName = clusterName;
         try
         {
