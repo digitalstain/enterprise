@@ -20,7 +20,7 @@
 package org.neo4j.com;
 
 import static org.neo4j.com.Protocol.writeString;
-import static org.neo4j.com.SlaveContext.lastAppliedTx;
+import static org.neo4j.com.SlaveContext.Tx.lastAppliedTx;
 import static org.neo4j.kernel.configuration.Config.DEFAULT_DATA_SOURCE_NAME;
 
 import java.io.IOException;

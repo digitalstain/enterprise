@@ -40,7 +40,6 @@ import org.neo4j.com.ResourceReleaser;
 import org.neo4j.com.Response;
 import org.neo4j.com.Serializer;
 import org.neo4j.com.SlaveContext;
-import org.neo4j.com.StoreIdGetter;
 import org.neo4j.com.StoreWriter;
 import org.neo4j.com.TransactionStream;
 import org.neo4j.com.TxExtractor;
@@ -58,6 +57,11 @@ import org.neo4j.kernel.impl.util.StringLogger;
  */
 public class MasterClient153 extends Client15<Master> implements Master, MasterClient
 {
+
+    /* Version 1 first version
+     * Version 2 since 2012-01-24 */
+    static final byte PROTOCOL_VERSION = 2;
+
     static final ObjectSerializer<LockResult> LOCK_SERIALIZER = new ObjectSerializer<LockResult>()
     {
         public void write( LockResult responseObject, ChannelBuffer result ) throws IOException
@@ -79,12 +83,12 @@ public class MasterClient153 extends Client15<Master> implements Master, MasterC
     };
     private final int lockReadTimeout;
 
-    public MasterClient153( String hostNameOrIp, int port, StringLogger stringLogger, StoreIdGetter storeIdGetter,
+    public MasterClient153( String hostNameOrIp, int port, StringLogger stringLogger, StoreId storeId,
             ConnectionLostHandler connectionLostHandler, int readTimeoutSeconds, int lockReadTimeout,
             int maxConcurrentChannels )
     {
-        super( hostNameOrIp, port, stringLogger, storeIdGetter, MasterServer.FRAME_LENGTH,
-                MasterServer.PROTOCOL_VERSION, readTimeoutSeconds, maxConcurrentChannels, Math.min(
+        super( hostNameOrIp, port, stringLogger, storeId, MasterServer.FRAME_LENGTH, PROTOCOL_VERSION,
+                readTimeoutSeconds, maxConcurrentChannels, Math.min(
                         maxConcurrentChannels, DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT ),
                 connectionLostHandler );
         this.lockReadTimeout = lockReadTimeout;

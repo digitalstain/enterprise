@@ -67,8 +67,7 @@ public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements 
         super( zooKeeperServers, msgLog,
                 Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
                 Client18.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
-                Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT,
-                sessionTimeout );
+                Client18.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT, sessionTimeout, factory );
         this.clusterName = clusterName;
         try
         {

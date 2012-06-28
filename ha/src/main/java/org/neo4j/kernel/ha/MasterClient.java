@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.neo4j.com.Deserializer;
+import org.neo4j.com.MismatchingVersionHandler;
 import org.neo4j.com.ObjectSerializer;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
@@ -94,4 +95,6 @@ public interface MasterClient extends Master
 
     public Response<Void> copyTransactions( SlaveContext context, final String ds, final long startTxId,
             final long endTxId );
+
+    public void addMismatchingVersionHandler( MismatchingVersionHandler toAdd );
 }

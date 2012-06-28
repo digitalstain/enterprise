@@ -27,9 +27,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.neo4j.com.ConnectionLostHandler;
 import org.neo4j.com.BlockLogBuffer;
 import org.neo4j.com.Client18;
+import org.neo4j.com.ConnectionLostHandler;
 import org.neo4j.com.Deserializer;
 import org.neo4j.com.MasterCaller;
 import org.neo4j.com.Protocol;
@@ -55,15 +55,19 @@ import org.neo4j.kernel.impl.util.StringLogger;
  */
 public class MasterClient18 extends Client18<Master> implements MasterClient
 {
+    /* Version 1 first version
+     * Version 2 since 2012-01-24
+     * Version 3 since 2012-02-16 */
+    static final byte PROTOCOL_VERSION = 3;
 
     private final int lockReadTimeout;
 
     public MasterClient18( String hostNameOrIp, int port, StringLogger stringLogger, StoreId storeId, ConnectionLostHandler connectionLostHandler,
             int readTimeoutSeconds, int lockReadTimeout, int maxConcurrentChannels )
     {
-        super( hostNameOrIp, port, stringLogger, storeId,
-                MasterServer.FRAME_LENGTH, MasterServer.PROTOCOL_VERSION, readTimeoutSeconds,
-                maxConcurrentChannels, Math.min( maxConcurrentChannels, DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT ),connectionLostHandler );
+        super( hostNameOrIp, port, stringLogger, storeId, MasterServer.FRAME_LENGTH, PROTOCOL_VERSION,
+                readTimeoutSeconds, maxConcurrentChannels, Math.min( maxConcurrentChannels,
+                        DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT ), connectionLostHandler );
         this.lockReadTimeout = lockReadTimeout;
     }
 
@@ -230,7 +234,7 @@ public class MasterClient18 extends Client18<Master> implements MasterClient
                  * This is effectively the use case of awaiting a lock that isn't granted
                  * within the lock read timeout period.
                  */
-                return new Response<Void>( null, getMyStoreId(), TransactionStream.EMPTY, ResourceReleaser.NO_OP );
+                return new Response<Void>( null, getStoreId(), TransactionStream.EMPTY, ResourceReleaser.NO_OP );
             }
             throw e;
         }

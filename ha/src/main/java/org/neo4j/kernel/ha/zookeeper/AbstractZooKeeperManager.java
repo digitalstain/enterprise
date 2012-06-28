@@ -63,8 +63,7 @@ public abstract class AbstractZooKeeperManager
 
     private final MasterClientFactory masterClientFactory;
 
-    public AbstractZooKeeperManager( String servers, StringLogger msgLog,
- int clientReadTimeout,
+    public AbstractZooKeeperManager( String servers, StringLogger msgLog, int clientReadTimeout,
             int clientLockReadTimeout, int maxConcurrentChannelsPerSlave, int sessionTimeout,
             MasterClientFactory masterClientFactory )
     {
