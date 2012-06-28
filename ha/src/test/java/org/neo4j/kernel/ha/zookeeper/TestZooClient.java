@@ -33,6 +33,7 @@ import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.configuration.ConfigurationDefaults;
 import org.neo4j.kernel.ha.ClusterEventReceiver;
 import org.neo4j.kernel.ha.HaSettings;
+import org.neo4j.kernel.ha.MasterClientFactory;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.test.ha.LocalhostZooKeeperCluster;
 
@@ -63,7 +64,8 @@ public class TestZooClient
         stringConfig.put( HaSettings.zk_session_timeout.name(), Long.toString( millisForSessionToExpire ) );
         Config config = new Config(new ConfigurationDefaults(OnlineBackupSettings.class, GraphDatabaseSettings.class, HaSettings.class ).apply( stringConfig ));
 
-        ZooClient client = new ZooClient( "", StringLogger.SYSTEM, config, null, DummyClusterReceiver );
+        ZooClient client = new ZooClient( "", StringLogger.SYSTEM, config, null, DummyClusterReceiver,
+                MasterClientFactory.F18 );
 
         final AtomicBoolean stop = new AtomicBoolean( false );
         Thread launchesZK = new Thread(new Runnable()
@@ -114,7 +116,8 @@ public class TestZooClient
         stringConfig.put( HaSettings.zk_session_timeout.name(), Long.toString( secondsForSessionToExpire ) );
         Config config = new Config(new ConfigurationDefaults(OnlineBackupSettings.class, GraphDatabaseSettings.class, HaSettings.class ).apply( stringConfig ));
 
-        ZooClient client = new ZooClient( "", StringLogger.SYSTEM, config, null, DummyClusterReceiver );
+        ZooClient client = new ZooClient( "", StringLogger.SYSTEM, config, null, DummyClusterReceiver,
+                MasterClientFactory.F18 );
 
         final Thread me = Thread.currentThread();
         final AtomicBoolean allOk = new AtomicBoolean( false );

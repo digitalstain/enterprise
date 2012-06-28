@@ -64,6 +64,7 @@ import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha.ClusterEventReceiver;
 import org.neo4j.kernel.ha.ConnectionInformation;
 import org.neo4j.kernel.ha.HaSettings;
+import org.neo4j.kernel.ha.MasterClientFactory;
 import org.neo4j.kernel.ha.MasterImpl;
 import org.neo4j.kernel.ha.MasterServer;
 import org.neo4j.kernel.ha.SlaveDatabaseOperations;
@@ -107,12 +108,12 @@ public class ZooClient extends AbstractZooKeeperManager
     private final WatcherImpl watcher;
 
     public ZooClient( String storeDir, StringLogger stringLogger, Config conf, SlaveDatabaseOperations localDatabase,
-            ClusterEventReceiver clusterReceiver )
+            ClusterEventReceiver clusterReceiver, MasterClientFactory factory )
     {
         super( conf.get( HaSettings.coordinators ), stringLogger,
             conf.getInteger( read_timeout ),
             conf.isSet( lock_read_timeout ) ? conf.getInteger( lock_read_timeout) : conf.getInteger( read_timeout ),
-                conf.getInteger( max_concurrent_channels_per_slave ), conf.getInteger( zk_session_timeout ));
+                conf.getInteger( max_concurrent_channels_per_slave ), conf.getInteger( zk_session_timeout ), factory );
         this.storeDir = storeDir;
         this.conf = conf;
         this.localDatabase = localDatabase;

@@ -20,7 +20,7 @@
 
 package org.neo4j.kernel.ha;
 
-import org.neo4j.com.Protocol18;
+import org.neo4j.com.Protocol;
 import org.neo4j.com.TxChecksumVerifier;
 import org.neo4j.helpers.Pair;
 import org.neo4j.kernel.GraphDatabaseAPI;
@@ -60,8 +60,8 @@ public class FakeMasterBroker extends AbstractBroker
     {
         int timeOut = config.isSet( HaSettings.lock_read_timeout ) ? config.getInteger( HaSettings.lock_read_timeout ) : config
             .getInteger( HaSettings.read_timeout );
-        return new MasterServer( new MasterImpl( graphDb, timeOut ),
-                Protocol18.PORT, graphDb.getMessageLog(), config.getInteger( HaSettings.max_concurrent_channels_per_slave ),
+        return new MasterServer( new MasterImpl( graphDb, timeOut ), Protocol.PORT, graphDb.getMessageLog(),
+                config.getInteger( HaSettings.max_concurrent_channels_per_slave ),
                 timeOut, TxChecksumVerifier.ALWAYS_MATCH );
     }
 }

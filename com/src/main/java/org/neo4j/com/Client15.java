@@ -26,7 +26,9 @@ import static org.neo4j.com.Protocol.writeString;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -76,6 +78,7 @@ public abstract class Client15<M> implements ChannelPipelineFactory
     private final int readTimeout;
     private final byte applicationProtocolVersion;
     private final ResourceReleaser resourcePoolReleaser;
+    private final List<MismatchingVersionHandler> mismatchingVersionHandlers;
 
     public Client15( String hostNameOrIp, int port, StringLogger logger, StoreId storeId, int frameLength,
             byte applicationProtocolVersion, int readTimeout, int maxConcurrentChannels, int maxUnusedPoolSize )
@@ -92,6 +95,7 @@ public abstract class Client15<M> implements ChannelPipelineFactory
         this.myStoreId = storeId;
         this.applicationProtocolVersion = applicationProtocolVersion;
         this.readTimeout = readTimeout;
+        this.mismatchingVersionHandlers = new ArrayList<MismatchingVersionHandler>( 2 );
         channelPool = new ResourcePool<Triplet<Channel, ChannelBuffer, ByteBuffer>>( maxConcurrentChannels,
                 maxUnusedPoolSize )
         {
@@ -394,5 +398,10 @@ public abstract class Client15<M> implements ChannelPipelineFactory
         {
             buffer.resetReaderIndex();
         }
+    }
+
+    public void addMismatchingVersionHandler( MismatchingVersionHandler toAdd )
+    {
+        mismatchingVersionHandlers.add( toAdd );
     }
 }

@@ -66,9 +66,11 @@ public abstract class AbstractZooKeeperManager
     protected final int clientLockReadTimeout;
     private final long sessionTimeout;
 
-    public AbstractZooKeeperManager( String servers, StringLogger msgLog,
-            int clientReadTimeout, int clientLockReadTimeout, int maxConcurrentChannelsPerSlave, int sessionTimeout )
+    private final MasterClientFactory masterClientFactory;
 
+    public AbstractZooKeeperManager( String servers, StringLogger msgLog, int clientReadTimeout,
+            int clientLockReadTimeout, int maxConcurrentChannelsPerSlave, int sessionTimeout,
+            MasterClientFactory masterClientFactory )
     {
         assert msgLog != null;
 
@@ -78,6 +80,7 @@ public abstract class AbstractZooKeeperManager
         this.maxConcurrentChannelsPerSlave = maxConcurrentChannelsPerSlave;
         this.clientReadTimeout = clientReadTimeout;
         this.sessionTimeout = sessionTimeout;
+        this.masterClientFactory = masterClientFactory;
     }
 
     protected String asRootPath( StoreId storeId )
@@ -198,21 +201,14 @@ public abstract class AbstractZooKeeperManager
         return null;
     }
 
-    protected StoreId getStoreId()
-    {
-        // TODO
-        return null;
-    }
-
     protected Master getMasterClientToMachine( Machine master )
     {
         if ( master == Machine.NO_MACHINE || master.getServer() == null )
         {
             return NO_MASTER;
         }
-        return new MasterClient18( master.getServer().first(),
-                master.getServer().other(), this.msgLog, getStoreId(),
-                ConnectionLostHandler.NO_ACTION, clientReadTimeout,
+        return masterClientFactory.instantiate( master.getServer().first(), master.getServer().other().intValue(),
+                this.msgLog, getStoreId(), clientReadTimeout, clientLockReadTimeout, maxConcurrentChannelsPerSlave );
     }
 
     protected abstract int getMyMachineId();
