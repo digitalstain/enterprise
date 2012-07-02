@@ -31,11 +31,11 @@ import java.nio.channels.ReadableByteChannel;
 
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.neo4j.com.BlockLogReader;
-import org.neo4j.com.MasterCaller;
 import org.neo4j.com.ObjectSerializer;
+import org.neo4j.com.RequestContext;
 import org.neo4j.com.RequestType;
 import org.neo4j.com.Response;
-import org.neo4j.com.SlaveContext;
+import org.neo4j.com.TargetCaller;
 import org.neo4j.com.ToNetworkStoreWriter;
 import org.neo4j.com.TxExtractor;
 import org.neo4j.helpers.Pair;
@@ -46,9 +46,10 @@ import org.neo4j.kernel.impl.nioneo.store.IdRange;
 public enum HaRequestType18 implements RequestType<Master>
 {
     // ====
-    ALLOCATE_IDS( new MasterCaller<Master, IdAllocation>()
+    ALLOCATE_IDS( new TargetCaller<Master, IdAllocation>()
     {
-        public Response<IdAllocation> callMaster( Master master, SlaveContext context, ChannelBuffer input,
+        @Override
+        public Response<IdAllocation> call( Master master, RequestContext context, ChannelBuffer input,
                 ChannelBuffer target )
         {
             IdType idType = IdType.values()[input.readByte()];
@@ -72,9 +73,10 @@ public enum HaRequestType18 implements RequestType<Master>
     }, false ),
 
     // ====
-    CREATE_RELATIONSHIP_TYPE( new MasterCaller<Master, Integer>()
+    CREATE_RELATIONSHIP_TYPE( new TargetCaller<Master, Integer>()
     {
-        public Response<Integer> callMaster( Master master, SlaveContext context, ChannelBuffer input,
+        @Override
+        public Response<Integer> call( Master master, RequestContext context, ChannelBuffer input,
                 ChannelBuffer target )
         {
             return master.createRelationshipType( context, readString( input ) );
@@ -85,7 +87,7 @@ public enum HaRequestType18 implements RequestType<Master>
     ACQUIRE_NODE_WRITE_LOCK( new AquireLockCall()
     {
         @Override
-        Response<LockResult> lock( Master master, SlaveContext context, long... ids )
+        Response<LockResult> lock( Master master, RequestContext context, long... ids )
         {
             return master.acquireNodeWriteLock( context, ids );
         }
@@ -102,7 +104,7 @@ public enum HaRequestType18 implements RequestType<Master>
     ACQUIRE_NODE_READ_LOCK( new AquireLockCall()
     {
         @Override
-        Response<LockResult> lock( Master master, SlaveContext context, long... ids )
+        Response<LockResult> lock( Master master, RequestContext context, long... ids )
         {
             return master.acquireNodeReadLock( context, ids );
         }
@@ -119,7 +121,7 @@ public enum HaRequestType18 implements RequestType<Master>
     ACQUIRE_RELATIONSHIP_WRITE_LOCK( new AquireLockCall()
     {
         @Override
-        Response<LockResult> lock( Master master, SlaveContext context, long... ids )
+        Response<LockResult> lock( Master master, RequestContext context, long... ids )
         {
             return master.acquireRelationshipWriteLock( context, ids );
         }
@@ -136,7 +138,7 @@ public enum HaRequestType18 implements RequestType<Master>
     ACQUIRE_RELATIONSHIP_READ_LOCK( new AquireLockCall()
     {
         @Override
-        Response<LockResult> lock( Master master, SlaveContext context, long... ids )
+        Response<LockResult> lock( Master master, RequestContext context, long... ids )
         {
             return master.acquireRelationshipReadLock( context, ids );
         }
@@ -150,9 +152,11 @@ public enum HaRequestType18 implements RequestType<Master>
     },
 
     // ====
-    COMMIT( new MasterCaller<Master, Long>()
+    COMMIT( new TargetCaller<Master, Long>()
     {
-        public Response<Long> callMaster( Master master, SlaveContext context, ChannelBuffer input, ChannelBuffer target )
+        @Override
+        public Response<Long> call( Master master, RequestContext context, ChannelBuffer input,
+                ChannelBuffer target )
         {
             String resource = readString( input );
             final ReadableByteChannel reader = new BlockLogReader( input );
@@ -161,27 +165,32 @@ public enum HaRequestType18 implements RequestType<Master>
     }, LONG_SERIALIZER, true ),
 
     // ====
-    PULL_UPDATES( new MasterCaller<Master, Void>()
+    PULL_UPDATES( new TargetCaller<Master, Void>()
     {
-        public Response<Void> callMaster( Master master, SlaveContext context, ChannelBuffer input, ChannelBuffer target )
+        @Override
+        public Response<Void> call( Master master, RequestContext context, ChannelBuffer input,
+                ChannelBuffer target )
         {
             return master.pullUpdates( context );
         }
     }, VOID_SERIALIZER, true ),
 
     // ====
-    FINISH( new MasterCaller<Master, Void>()
+    FINISH( new TargetCaller<Master, Void>()
     {
-        public Response<Void> callMaster( Master master, SlaveContext context, ChannelBuffer input, ChannelBuffer target )
+        @Override
+        public Response<Void> call( Master master, RequestContext context, ChannelBuffer input,
+                ChannelBuffer target )
         {
             return master.finishTransaction( context, readBoolean( input ) );
         }
     }, VOID_SERIALIZER, true ),
 
     // ====
-    GET_MASTER_ID_FOR_TX( new MasterCaller<Master, Pair<Integer, Long>>()
+    GET_MASTER_ID_FOR_TX( new TargetCaller<Master, Pair<Integer, Long>>()
     {
-        public Response<Pair<Integer, Long>> callMaster( Master master, SlaveContext context, ChannelBuffer input,
+        @Override
+        public Response<Pair<Integer, Long>> call( Master master, RequestContext context, ChannelBuffer input,
                 ChannelBuffer target )
         {
             return master.getMasterIdForCommittedTx( input.readLong(), null );
@@ -197,9 +206,10 @@ public enum HaRequestType18 implements RequestType<Master>
     }, false ),
 
     // ====
-    COPY_STORE( new MasterCaller<Master, Void>()
+    COPY_STORE( new TargetCaller<Master, Void>()
     {
-        public Response<Void> callMaster( Master master, SlaveContext context, ChannelBuffer input,
+        @Override
+        public Response<Void> call( Master master, RequestContext context, ChannelBuffer input,
                 final ChannelBuffer target )
         {
             return master.copyStore( context, new ToNetworkStoreWriter( target ) );
@@ -208,9 +218,10 @@ public enum HaRequestType18 implements RequestType<Master>
     }, VOID_SERIALIZER, true ),
 
     // ====
-    COPY_TRANSACTIONS( new MasterCaller<Master, Void>()
+    COPY_TRANSACTIONS( new TargetCaller<Master, Void>()
     {
-        public Response<Void> callMaster( Master master, SlaveContext context, ChannelBuffer input,
+        @Override
+        public Response<Void> call( Master master, RequestContext context, ChannelBuffer input,
                 final ChannelBuffer target )
         {
             return master.copyTransactions( context, readString( input ), input.readLong(), input.readLong() );
@@ -219,20 +230,21 @@ public enum HaRequestType18 implements RequestType<Master>
     }, VOID_SERIALIZER, true ),
 
     // ====
-    INITIALIZE_TX( new MasterCaller<Master, Void>()
+    INITIALIZE_TX( new TargetCaller<Master, Void>()
     {
         @Override
-        public Response<Void> callMaster( Master master, SlaveContext context, ChannelBuffer input, ChannelBuffer target )
+        public Response<Void> call( Master master, RequestContext context, ChannelBuffer input,
+                ChannelBuffer target )
         {
             return master.initializeTx( context );
         }
     }, VOID_SERIALIZER, true ),
 
     // ====
-    ACQUIRE_GRAPH_WRITE_LOCK( new MasterCaller<Master, LockResult>()
+    ACQUIRE_GRAPH_WRITE_LOCK( new TargetCaller<Master, LockResult>()
     {
         @Override
-        public Response<LockResult> callMaster( Master master, SlaveContext context, ChannelBuffer input,
+        public Response<LockResult> call( Master master, RequestContext context, ChannelBuffer input,
                 ChannelBuffer target )
         {
             return master.acquireGraphWriteLock( context );
@@ -247,10 +259,10 @@ public enum HaRequestType18 implements RequestType<Master>
     },
 
     // ====
-    ACQUIRE_GRAPH_READ_LOCK( new MasterCaller<Master, LockResult>()
+    ACQUIRE_GRAPH_READ_LOCK( new TargetCaller<Master, LockResult>()
     {
         @Override
-        public Response<LockResult> callMaster( Master master, SlaveContext context, ChannelBuffer input,
+        public Response<LockResult> call( Master master, RequestContext context, ChannelBuffer input,
                 ChannelBuffer target )
         {
             return master.acquireGraphReadLock( context );
@@ -265,10 +277,10 @@ public enum HaRequestType18 implements RequestType<Master>
     },
 
     // ====
-    ACQUIRE_INDEX_READ_LOCK( new MasterCaller<Master, LockResult>()
+    ACQUIRE_INDEX_READ_LOCK( new TargetCaller<Master, LockResult>()
     {
         @Override
-        public Response<LockResult> callMaster( Master master, SlaveContext context, ChannelBuffer input,
+        public Response<LockResult> call( Master master, RequestContext context, ChannelBuffer input,
                 ChannelBuffer target )
         {
             return master.acquireIndexReadLock( context, readString( input ), readString( input ) );
@@ -284,10 +296,10 @@ public enum HaRequestType18 implements RequestType<Master>
     },
 
     // ====
-    ACQUIRE_INDEX_WRITE_LOCK( new MasterCaller<Master, LockResult>()
+    ACQUIRE_INDEX_WRITE_LOCK( new TargetCaller<Master, LockResult>()
     {
         @Override
-        public Response<LockResult> callMaster( Master master, SlaveContext context, ChannelBuffer input,
+        public Response<LockResult> call( Master master, RequestContext context, ChannelBuffer input,
                 ChannelBuffer target )
         {
             return master.acquireIndexWriteLock( context, readString( input ), readString( input ) );
@@ -303,12 +315,12 @@ public enum HaRequestType18 implements RequestType<Master>
     };
 
     @SuppressWarnings( "rawtypes" )
-    final MasterCaller caller;
+    final TargetCaller caller;
     @SuppressWarnings( "rawtypes" )
     final ObjectSerializer serializer;
     private final boolean includesSlaveContext;
 
-    private <T> HaRequestType18( MasterCaller caller, ObjectSerializer<T> serializer, boolean includesSlaveContext )
+    private <T> HaRequestType18( TargetCaller caller, ObjectSerializer<T> serializer, boolean includesSlaveContext )
     {
         this.caller = caller;
         this.serializer = serializer;
@@ -322,7 +334,7 @@ public enum HaRequestType18 implements RequestType<Master>
     }
 
     @Override
-    public MasterCaller getMasterCaller()
+    public TargetCaller getTargetCaller()
     {
         return caller;
     }

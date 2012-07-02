@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.Test;
 import org.neo4j.backup.OnlineBackupSettings;
+import org.neo4j.com.Client;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.configuration.ConfigurationDefaults;
@@ -64,8 +65,11 @@ public class TestZooClient
         stringConfig.put( HaSettings.zk_session_timeout.name(), Long.toString( millisForSessionToExpire ) );
         Config config = new Config(new ConfigurationDefaults(OnlineBackupSettings.class, GraphDatabaseSettings.class, HaSettings.class ).apply( stringConfig ));
 
+
         ZooClient client = new ZooClient( "", StringLogger.SYSTEM, config, null, DummyClusterReceiver,
-                MasterClientFactory.F18 );
+                new MasterClientFactory.F18( StringLogger.SYSTEM, Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                        Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                        Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT ) );
 
         final AtomicBoolean stop = new AtomicBoolean( false );
         Thread launchesZK = new Thread(new Runnable()
@@ -117,7 +121,9 @@ public class TestZooClient
         Config config = new Config(new ConfigurationDefaults(OnlineBackupSettings.class, GraphDatabaseSettings.class, HaSettings.class ).apply( stringConfig ));
 
         ZooClient client = new ZooClient( "", StringLogger.SYSTEM, config, null, DummyClusterReceiver,
-                MasterClientFactory.F18 );
+                new MasterClientFactory.F18( StringLogger.SYSTEM, Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                        Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
+                        Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT ) );
 
         final Thread me = Thread.currentThread();
         final AtomicBoolean allOk = new AtomicBoolean( false );

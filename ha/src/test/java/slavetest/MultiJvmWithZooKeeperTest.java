@@ -29,8 +29,9 @@ import org.junit.Ignore;
 import org.neo4j.test.ha.LocalhostZooKeeperCluster;
 import org.neo4j.test.ha.StandaloneDatabase;
 
-@Ignore( "Too unstable to have as unit tests. The HA Cronies will make sure the ZooKeeper " +
-		"aspect of HA is working correctly" )
+//@Ignore( "Too unstable to have as unit tests. The HA Cronies will make sure the ZooKeeper " +
+//		"aspect of HA is working correctly" )
+@Ignore
 public class MultiJvmWithZooKeeperTest extends MultiJvmTest
 {
     private static final File BASE_ZOO_KEEPER_DATA_DIR =

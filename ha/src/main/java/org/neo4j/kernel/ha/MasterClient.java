@@ -29,13 +29,10 @@ import org.jboss.netty.buffer.ChannelBuffer;
 import org.neo4j.com.Deserializer;
 import org.neo4j.com.MismatchingVersionHandler;
 import org.neo4j.com.ObjectSerializer;
+import org.neo4j.com.RequestContext;
 import org.neo4j.com.Response;
-import org.neo4j.com.SlaveContext;
 import org.neo4j.com.StoreWriter;
 import org.neo4j.com.TxExtractor;
-import org.neo4j.helpers.Pair;
-import org.neo4j.kernel.IdType;
-import org.neo4j.kernel.impl.nioneo.store.StoreId;
 
 public interface MasterClient extends Master
 {
@@ -60,40 +57,36 @@ public interface MasterClient extends Master
         }
     };
 
-    public Response<IdAllocation> allocateIds( final IdType idType );
+    public Response<Integer> createRelationshipType( RequestContext context, final String name );
 
-    public Response<Integer> createRelationshipType( SlaveContext context, final String name );
+    public Response<Void> initializeTx( RequestContext context );
 
-    public Response<Void> initializeTx( SlaveContext context );
+    public Response<LockResult> acquireNodeReadLock( RequestContext context, long... nodes );
 
-    public Response<LockResult> acquireNodeReadLock( SlaveContext context, long... nodes );
+    public Response<LockResult> acquireRelationshipWriteLock( RequestContext context, long... relationships );
 
-    public Response<LockResult> acquireRelationshipWriteLock( SlaveContext context, long... relationships );
+    public Response<LockResult> acquireRelationshipReadLock( RequestContext context, long... relationships );
 
-    public Response<LockResult> acquireRelationshipReadLock( SlaveContext context, long... relationships );
+    public Response<LockResult> acquireGraphWriteLock( RequestContext context );
 
-    public Response<LockResult> acquireGraphWriteLock( SlaveContext context );
+    public Response<LockResult> acquireGraphReadLock( RequestContext context );
 
-    public Response<LockResult> acquireGraphReadLock( SlaveContext context );
+    public Response<LockResult> acquireIndexReadLock( RequestContext context, String index, String key );
 
-    public Response<LockResult> acquireIndexReadLock( SlaveContext context, String index, String key );
+    public Response<LockResult> acquireIndexWriteLock( RequestContext context, String index, String key );
 
-    public Response<LockResult> acquireIndexWriteLock( SlaveContext context, String index, String key );
-
-    public Response<Long> commitSingleResourceTransaction( SlaveContext context, final String resource,
+    public Response<Long> commitSingleResourceTransaction( RequestContext context, final String resource,
             final TxExtractor txGetter );
 
-    public Response<Void> finishTransaction( SlaveContext context, final boolean success );
+    public Response<Void> finishTransaction( RequestContext context, final boolean success );
 
-    public void rollbackOngoingTransactions( SlaveContext context );
+    public void rollbackOngoingTransactions( RequestContext context );
 
-    public Response<Void> pullUpdates( SlaveContext context );
+    public Response<Void> pullUpdates( RequestContext context );
 
-    public Response<Pair<Integer, Long>> getMasterIdForCommittedTx( final long txId, StoreId storeId );
+    public Response<Void> copyStore( RequestContext context, final StoreWriter writer );
 
-    public Response<Void> copyStore( SlaveContext context, final StoreWriter writer );
-
-    public Response<Void> copyTransactions( SlaveContext context, final String ds, final long startTxId,
+    public Response<Void> copyTransactions( RequestContext context, final String ds, final long startTxId,
             final long endTxId );
 
     public void addMismatchingVersionHandler( MismatchingVersionHandler toAdd );

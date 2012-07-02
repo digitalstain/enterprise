@@ -36,9 +36,9 @@ import javax.transaction.SystemException;
 import javax.transaction.Transaction;
 import javax.transaction.TransactionManager;
 
-import org.neo4j.com.MasterUtil;
+import org.neo4j.com.RequestContext;
 import org.neo4j.com.Response;
-import org.neo4j.com.SlaveContext;
+import org.neo4j.com.ServerUtil;
 import org.neo4j.com.StoreWriter;
 import org.neo4j.com.TxExtractor;
 import org.neo4j.graphdb.Node;
@@ -73,7 +73,7 @@ public class MasterImpl implements Master
     private final GraphDatabaseAPI graphDb;
     private final StringLogger msgLog;
 
-    private final Map<SlaveContext, MasterTransaction> transactions = synchronizedMap( new HashMap<SlaveContext, MasterTransaction>() );
+    private final Map<RequestContext, MasterTransaction> transactions = synchronizedMap( new HashMap<RequestContext, MasterTransaction>() );
     private final ScheduledExecutorService unfinishedTransactionsExecutor;
     private int unfinishedTransactionThreshold;
 
@@ -90,13 +90,13 @@ public class MasterImpl implements Master
             {
                 try
                 {
-                    Map<SlaveContext, MasterTransaction> safeTransactions = null;
+                    Map<RequestContext, MasterTransaction> safeTransactions = null;
                     synchronized ( transactions )
                     {
-                        safeTransactions = new HashMap<SlaveContext, MasterTransaction>( transactions );
+                        safeTransactions = new HashMap<RequestContext, MasterTransaction>( transactions );
                     }
 
-                    for ( Map.Entry<SlaveContext, MasterTransaction> entry : safeTransactions.entrySet() )
+                    for ( Map.Entry<RequestContext, MasterTransaction> entry : safeTransactions.entrySet() )
                     {
                         long time = entry.getValue().timeLastSuspended.get();
                         if ( time != 0 && System.currentTimeMillis()-time >= unfinishedTransactionThreshold*1000 )
@@ -135,7 +135,7 @@ public class MasterImpl implements Master
     }
 
     @Override
-    public Response<Void> initializeTx( SlaveContext context )
+    public Response<Void> initializeTx( RequestContext context )
     {
         Transaction otherTx = suspendOtherAndResumeThis( context, true );
         try
@@ -148,7 +148,7 @@ public class MasterImpl implements Master
         }
     }
 
-    private Response<LockResult> acquireLock( SlaveContext context,
+    private Response<LockResult> acquireLock( RequestContext context,
             LockGrabber lockGrabber, Object... entities )
     {
         Transaction otherTx = suspendOtherAndResumeThis( context, false );
@@ -176,17 +176,17 @@ public class MasterImpl implements Master
         }
     }
 
-    private <T> Response<T> packResponse( SlaveContext context, T response )
+    private <T> Response<T> packResponse( RequestContext context, T response )
     {
-        return packResponse( context, response, MasterUtil.ALL );
+        return packResponse( context, response, ServerUtil.ALL );
     }
 
-    private <T> Response<T> packResponse( SlaveContext context, T response, Predicate<Long> filter )
+    private <T> Response<T> packResponse( RequestContext context, T response, Predicate<Long> filter )
     {
-        return MasterUtil.packResponse( graphDb, context, response, filter );
+        return ServerUtil.packResponse( graphDb, context, response, filter );
     }
 
-    private Transaction getTx( SlaveContext txId )
+    private Transaction getTx( RequestContext txId )
     {
         MasterTransaction result = transactions.get( txId );
         if ( result != null )
@@ -200,7 +200,7 @@ public class MasterImpl implements Master
         return null;
     }
 
-    private Transaction beginTx( SlaveContext txId )
+    private Transaction beginTx( RequestContext txId )
     {
         try
         {
@@ -220,7 +220,7 @@ public class MasterImpl implements Master
         }
     }
 
-    Transaction suspendOtherAndResumeThis( SlaveContext txId, boolean allowBegin )
+    Transaction suspendOtherAndResumeThis( RequestContext txId, boolean allowBegin )
     {
         try
         {
@@ -271,7 +271,7 @@ public class MasterImpl implements Master
         }
     }
 
-    void suspendThisAndResumeOther( Transaction otherTx, SlaveContext txId )
+    void suspendThisAndResumeOther( Transaction otherTx, RequestContext txId )
     {
         try
         {
@@ -301,7 +301,7 @@ public class MasterImpl implements Master
         }
     }
 
-    void finishThisAndResumeOther( Transaction otherTx, SlaveContext txId, boolean success )
+    void finishThisAndResumeOther( Transaction otherTx, RequestContext txId, boolean success )
     {
         try
         {
@@ -320,34 +320,34 @@ public class MasterImpl implements Master
         }
     }
 
-    public Response<LockResult> acquireNodeReadLock( SlaveContext context, long... nodes )
+    public Response<LockResult> acquireNodeReadLock( RequestContext context, long... nodes )
     {
         return acquireLock( context, READ_LOCK_GRABBER, nodesById( nodes ) );
     }
 
-    public Response<LockResult> acquireNodeWriteLock( SlaveContext context, long... nodes )
+    public Response<LockResult> acquireNodeWriteLock( RequestContext context, long... nodes )
     {
         return acquireLock( context, WRITE_LOCK_GRABBER, nodesById( nodes ) );
     }
 
-    public Response<LockResult> acquireRelationshipReadLock( SlaveContext context,
+    public Response<LockResult> acquireRelationshipReadLock( RequestContext context,
             long... relationships )
     {
         return acquireLock( context, READ_LOCK_GRABBER, relationshipsById( relationships ) );
     }
 
-    public Response<LockResult> acquireRelationshipWriteLock( SlaveContext context,
+    public Response<LockResult> acquireRelationshipWriteLock( RequestContext context,
             long... relationships )
     {
         return acquireLock( context, WRITE_LOCK_GRABBER, relationshipsById( relationships ) );
     }
 
-    public Response<LockResult> acquireGraphReadLock( SlaveContext context )
+    public Response<LockResult> acquireGraphReadLock( RequestContext context )
     {
         return acquireLock( context, READ_LOCK_GRABBER, graphProperties() );
     }
 
-    public Response<LockResult> acquireGraphWriteLock( SlaveContext context )
+    public Response<LockResult> acquireGraphWriteLock( RequestContext context )
     {
         return acquireLock( context, WRITE_LOCK_GRABBER, graphProperties() );
     }
@@ -382,10 +382,10 @@ public class MasterImpl implements Master
         IdGenerator generator = graphDb.getIdGeneratorFactory().get( idType );
         IdAllocation result = new IdAllocation( generator.nextIdBatch( ID_GRAB_SIZE ), generator.getHighId(),
                 generator.getDefragCount() );
-        return MasterUtil.packResponseWithoutTransactionStream( graphDb, SlaveContext.EMPTY, result );
+        return ServerUtil.packResponseWithoutTransactionStream( graphDb, RequestContext.EMPTY, result );
     }
 
-    public Response<Long> commitSingleResourceTransaction( SlaveContext context, String resource,
+    public Response<Long> commitSingleResourceTransaction( RequestContext context, String resource,
             TxExtractor txGetter )
     {
         Transaction otherTx = suspendOtherAndResumeThis( context, false );
@@ -413,7 +413,7 @@ public class MasterImpl implements Master
         }
     }
 
-    public Response<Void> finishTransaction( SlaveContext context, boolean success )
+    public Response<Void> finishTransaction( RequestContext context, boolean success )
     {
         Transaction otherTx;
         try
@@ -430,13 +430,13 @@ public class MasterImpl implements Master
         return packResponse( context, null );
     }
 
-    public Response<Integer> createRelationshipType( SlaveContext context, String name )
+    public Response<Integer> createRelationshipType( RequestContext context, String name )
     {
         graphDb.getRelationshipTypeHolder().addValidRelationshipType( name, true );
         return packResponse( context, graphDb.getRelationshipTypeHolder().getIdFor( name ) );
     }
 
-    public Response<Void> pullUpdates( SlaveContext context )
+    public Response<Void> pullUpdates( RequestContext context )
     {
         return packResponse( context, null );
     }
@@ -448,7 +448,7 @@ public class MasterImpl implements Master
         try
         {
             Pair<Integer, Long> masterId = nioneoDataSource.getMasterForCommittedTx( txId );
-            return MasterUtil.packResponseWithoutTransactionStream( graphDb, SlaveContext.EMPTY, masterId );
+            return ServerUtil.packResponseWithoutTransactionStream( graphDb, RequestContext.EMPTY, masterId );
         }
         catch ( IOException e )
         {
@@ -456,18 +456,18 @@ public class MasterImpl implements Master
         }
     }
 
-    public Response<Void> copyStore( SlaveContext context, StoreWriter writer )
+    public Response<Void> copyStore( RequestContext context, StoreWriter writer )
     {
-        context = MasterUtil.rotateLogsAndStreamStoreFiles( graphDb, true, writer );
+        context = ServerUtil.rotateLogsAndStreamStoreFiles( graphDb, true, writer );
         writer.done();
         return packResponse( context, null );
     }
 
     @Override
-    public Response<Void> copyTransactions( SlaveContext context,
+    public Response<Void> copyTransactions( RequestContext context,
             String dsName, long startTxId, long endTxId )
     {
-        return MasterUtil.getTransactions( graphDb, dsName, startTxId, endTxId );
+        return ServerUtil.getTransactions( graphDb, dsName, startTxId, endTxId );
     }
 
     @Override
@@ -500,13 +500,13 @@ public class MasterImpl implements Master
     };
 
     @Override
-    public Response<LockResult> acquireIndexReadLock( SlaveContext context, String index, String key )
+    public Response<LockResult> acquireIndexReadLock( RequestContext context, String index, String key )
     {
         return acquireLock( context, READ_LOCK_GRABBER, new NodeManager.IndexLock( index, key ) );
     }
 
     @Override
-    public Response<LockResult> acquireIndexWriteLock( SlaveContext context, String index,
+    public Response<LockResult> acquireIndexWriteLock( RequestContext context, String index,
             String key )
     {
         return acquireLock( context, WRITE_LOCK_GRABBER, new NodeManager.IndexLock( index, key ) );
@@ -517,15 +517,15 @@ public class MasterImpl implements Master
     // but exposed so that other tools can reach that information.
     // =====================================================================
 
-    public Map<Integer, Collection<SlaveContext>> getOngoingTransactions()
+    public Map<Integer, Collection<RequestContext>> getOngoingTransactions()
     {
-        Map<Integer, Collection<SlaveContext>> result = new HashMap<Integer, Collection<SlaveContext>>();
-        for ( SlaveContext context : transactions.keySet() )
+        Map<Integer, Collection<RequestContext>> result = new HashMap<Integer, Collection<RequestContext>>();
+        for ( RequestContext context : transactions.keySet() )
         {
-            Collection<SlaveContext> txs = result.get( context.machineId() );
+            Collection<RequestContext> txs = result.get( context.machineId() );
             if ( txs == null )
             {
-                txs = new ArrayList<SlaveContext>();
+                txs = new ArrayList<RequestContext>();
                 result.put( context.machineId(), txs );
             }
             txs.add( context );
