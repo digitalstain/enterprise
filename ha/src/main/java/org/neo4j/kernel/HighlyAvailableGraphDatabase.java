@@ -245,7 +245,7 @@ public class HighlyAvailableGraphDatabase
                 configuration.isSet( HaSettings.lock_read_timeout ) ? configuration.getInteger( HaSettings.lock_read_timeout )
                         : configuration.getInteger( HaSettings.read_timeout ),
                 configuration.getInteger( HaSettings.max_concurrent_channels_per_slave ) );
-        this.clientFactory = masterClientResolver.getFor( 3, 2 );
+        this.clientFactory = masterClientResolver.getFor( 2, 2 );
         // TODO The dependency from BrokerFactory to 'this' is completely broken. Needs rethinking
         this.broker = createBroker();
         this.pullUpdates = false;
@@ -1002,9 +1002,14 @@ public class HighlyAvailableGraphDatabase
         catch ( IllegalProtocolVersionException e )
         {
             safelyShutdownDb( newDb );
-            messageLog.logMessage( "Hey, expected " + e.getExpected() + " but got " + e.getReceived() );
-            clientFactory = masterClientResolver.getFor( e.getReceived(), 2 );
-            broker = createBroker();
+            messageLog.logMessage( "Hey, expected " + e.getExpected() + " but got " + e.getReceived(), true );
+            System.out.println( "Hey, expected " + e.getExpected() + " but got " + e.getReceived() );
+            e.printStackTrace();
+            if ( masterClientResolver.getFor( e.getReceived(), 2 ) != null )
+            {
+                clientFactory = masterClientResolver.getFor( e.getReceived(), 2 );
+                broker = createBroker();
+            }
             throw e;
         }
         catch ( Throwable t )

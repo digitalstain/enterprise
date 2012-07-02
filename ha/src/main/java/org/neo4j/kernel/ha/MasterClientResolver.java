@@ -59,7 +59,7 @@ public class MasterClientResolver
         }
 
         static final ProtocolCombo PC_153 = new ProtocolCombo( 2, 2 );
-        static final ProtocolCombo PC_18 = new ProtocolCombo( 2, 3 );
+        static final ProtocolCombo PC_18 = new ProtocolCombo( 3, 2 );
     }
 
     private final Map<ProtocolCombo, MasterClientFactory> protocolToFactoryMapping;
@@ -75,8 +75,6 @@ public class MasterClientResolver
 
     public MasterClientFactory getFor( int applicationProtocol, int internalProtocol )
     {
-        System.out.println( "getting master client factory for application " + applicationProtocol + ", internal "
-                            + internalProtocol );
         return protocolToFactoryMapping.get( new ProtocolCombo( applicationProtocol, internalProtocol ) );
     }
 
