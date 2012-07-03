@@ -58,7 +58,7 @@ public class MasterClient18 extends Client<Master> implements MasterClient
     /* Version 1 first version
      * Version 2 since 2012-01-24
      * Version 3 since 2012-02-16 */
-    static final byte PROTOCOL_VERSION = 3;
+    public static final byte PROTOCOL_VERSION = 3;
 
     private final int lockReadTimeout;
 

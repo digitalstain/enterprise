@@ -75,7 +75,6 @@ import org.neo4j.kernel.ha.ClusterEventReceiver;
 import org.neo4j.kernel.ha.HaCaches;
 import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.Master;
-import org.neo4j.kernel.ha.MasterClientFactory;
 import org.neo4j.kernel.ha.MasterClientResolver;
 import org.neo4j.kernel.ha.MasterGraphDatabase;
 import org.neo4j.kernel.ha.MasterServer;
@@ -224,7 +223,7 @@ public class HighlyAvailableGraphDatabase
          */
         slaveOperations = new LocalDatabaseOperations();
 
-//        databaseLock = new ReentrantReadWriteLock(  );
+        // databaseLock = new ReentrantReadWriteLock( );
 
         this.nodeLookup = new HANodeLookup();
 
@@ -244,8 +243,9 @@ public class HighlyAvailableGraphDatabase
                 configuration.isSet( HaSettings.lock_read_timeout ) ? configuration.getInteger( HaSettings.lock_read_timeout )
                         : configuration.getInteger( HaSettings.read_timeout ),
                 configuration.getInteger( HaSettings.max_concurrent_channels_per_slave ) );
-        theProxy.clientFactory = masterClientResolver.getDefault();
-        // TODO The dependency from BrokerFactory to 'this' is completely broken. Needs rethinking
+        masterClientResolver.getFor( 2, 2 );
+        // TODO The dependency from BrokerFactory to 'this' is completely
+        // broken. Needs rethinking
         this.broker = createBroker();
         this.pullUpdates = false;
         this.clusterClient = createClusterClient();
@@ -620,10 +620,6 @@ public class HighlyAvailableGraphDatabase
                 corrupted = true;
             }
         }
-        catch ( IllegalProtocolVersionException e )
-        {
-            throw e;
-        }
         catch ( NoSuchLogVersionException e )
         {
             getMessageLog().logMessage(
@@ -763,16 +759,7 @@ public class HighlyAvailableGraphDatabase
         getMessageLog().logMessage( "Copying store from master" );
         String temp = getClearedTempDir().getAbsolutePath();
         Response<Void> response = null;
-        try
-        {
-            response = master.first().copyStore( emptyContext(),
-                new ToFileStoreWriter( temp ) );
-        }
-        catch ( IllegalProtocolVersionException e )
-        {
-            theProxy.clientFactory = masterClientResolver.getFor( e.getReceived(), 2 );
-            throw e;
-        }
+        response = master.first().copyStore( emptyContext(), new ToFileStoreWriter( temp ) );
         long highestLogVersion = highestLogVersion( temp );
         if( highestLogVersion > -1 )
         {
@@ -997,19 +984,6 @@ public class HighlyAvailableGraphDatabase
                 // Now ok to pull updates
             }
             pullUpdates = true;
-        }
-        catch ( IllegalProtocolVersionException e )
-        {
-            safelyShutdownDb( newDb );
-            messageLog.logMessage( "Hey, expected " + e.getExpected() + " but got " + e.getReceived(), true );
-            System.out.println( "Hey, expected " + e.getExpected() + " but got " + e.getReceived() );
-            if ( masterClientResolver.getFor( e.getReceived(), 2 ) != null )
-            {
-                System.out.println( "Got new master client" );
-                theProxy.clientFactory = masterClientResolver.getFor( e.getReceived(), 2 );
-                broker.restart();
-            }
-            throw e;
         }
         catch ( Throwable t )
         {
@@ -1348,6 +1322,14 @@ public class HighlyAvailableGraphDatabase
                 sleepWithoutInterruption( 500, "" );
                 continue;
             }
+            catch ( IllegalProtocolVersionException pe )
+            {
+                getMessageLog().logMessage( "Hey, expected " + pe.getExpected() + " but got " + pe.getReceived(), e );
+                broker.restart();
+                e = pe;
+                cause = pe;
+                continue;
+            }
             catch ( ComException ce )
             {
                 getMessageLog().logMessage(
@@ -1399,18 +1381,6 @@ public class HighlyAvailableGraphDatabase
         return getMasterServerIfMaster() != null;
     }
 
-    public static class ClientFactoryProxy
-    {
-        volatile MasterClientFactory clientFactory;
-
-        public MasterClientFactory getFactory()
-        {
-            return clientFactory;
-        }
-    }
-
-    private final ClientFactoryProxy theProxy = new ClientFactoryProxy();
-
     protected Broker createBroker()
     {
         return new ZooKeeperBroker( configuration, new ZooClientFactory()
@@ -1419,7 +1389,7 @@ public class HighlyAvailableGraphDatabase
             public ZooClient newZooClient()
             {
                 return new ZooClient( storeDir, messageLog, configuration, /* as SlaveDatabaseOperations for extracting master for tx */
-                slaveOperations, /* as ClusterEventReceiver */slaveOperations, theProxy );
+                slaveOperations, /* as ClusterEventReceiver */slaveOperations, masterClientResolver );
             }
         } );
     }
@@ -1433,7 +1403,7 @@ public class HighlyAvailableGraphDatabase
     {
         return new ZooKeeperClusterClient( configuration.get( HaSettings.coordinators ), getMessageLog(),
                 configuration.get( HaSettings.cluster_name ),
-                configuration.getInteger( HaSettings.zk_session_timeout ), theProxy );
+                configuration.getInteger( HaSettings.zk_session_timeout ), masterClientResolver );
     }
 
     // TODO This should be removed. Analyze usages

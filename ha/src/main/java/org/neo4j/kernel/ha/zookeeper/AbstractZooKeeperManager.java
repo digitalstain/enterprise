@@ -38,11 +38,11 @@ import org.neo4j.com.Response;
 import org.neo4j.com.StoreWriter;
 import org.neo4j.com.TxExtractor;
 import org.neo4j.helpers.Pair;
-import org.neo4j.kernel.HighlyAvailableGraphDatabase.ClientFactoryProxy;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.ha.IdAllocation;
 import org.neo4j.kernel.ha.LockResult;
 import org.neo4j.kernel.ha.Master;
+import org.neo4j.kernel.ha.MasterClientFactory;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.util.StringLogger;
 
@@ -64,17 +64,17 @@ public abstract class AbstractZooKeeperManager
     protected final StringLogger msgLog;
     private final long sessionTimeout;
 
-    private final ClientFactoryProxy masterClientFactory;
+    private final MasterClientFactory masterClientFactory;
 
     public AbstractZooKeeperManager( String servers, StringLogger msgLog, int sessionTimeout,
-            ClientFactoryProxy clientFactoryProxy )
+            MasterClientFactory clientFactory )
     {
         assert msgLog != null;
 
         this.servers = servers;
         this.msgLog = msgLog;
         this.sessionTimeout = sessionTimeout;
-        this.masterClientFactory = clientFactoryProxy;
+        this.masterClientFactory = clientFactory;
     }
 
     protected String asRootPath( StoreId storeId )
@@ -202,7 +202,7 @@ public abstract class AbstractZooKeeperManager
         {
             return NO_MASTER;
         }
-        return masterClientFactory.getFactory().instantiate( master.getServer().first(),
+        return masterClientFactory.instantiate( master.getServer().first(),
                 master.getServer().other().intValue(),
                 getStoreId() );
     }

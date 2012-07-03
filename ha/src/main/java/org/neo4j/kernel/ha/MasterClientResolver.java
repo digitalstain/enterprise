@@ -22,10 +22,32 @@ package org.neo4j.kernel.ha;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.neo4j.com.ConnectionLostHandler;
+import org.neo4j.com.MismatchingVersionHandler;
+import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.util.StringLogger;
 
-public class MasterClientResolver
+public class MasterClientResolver implements MasterClientFactory, MismatchingVersionHandler
 {
+    private volatile MasterClientFactory current;
+
+    @Override
+    public MasterClient instantiate( String hostNameOrIp, int port, StoreId storeId )
+    {
+        System.out.println( "was asked to instantiate " + current.getClass() );
+        MasterClient result = current.instantiate( hostNameOrIp, port, storeId );
+        result.addMismatchingVersionHandler( this );
+        return result;
+    }
+
+    @Override
+    public void versionMismatched( int expected, int received )
+    {
+        System.out.println( "Got mismatch, expected " + expected + ", received " + received );
+        getFor( received, 2 );
+        System.out.println( "So i instantiated " + current.getClass() );
+    }
+
     private static final class ProtocolCombo
     {
         final int applicationProtocol;
@@ -67,19 +89,69 @@ public class MasterClientResolver
     public MasterClientResolver( StringLogger messageLogger, int readTimeout, int lockReadTimeout, int channels )
     {
         protocolToFactoryMapping = new HashMap<ProtocolCombo, MasterClientFactory>();
-        protocolToFactoryMapping.put( ProtocolCombo.PC_153, new MasterClientFactory.F153( messageLogger, readTimeout,
-                lockReadTimeout, channels ) );
-        protocolToFactoryMapping.put( ProtocolCombo.PC_18, new MasterClientFactory.F18( messageLogger, readTimeout,
-                lockReadTimeout, channels ) );
+        protocolToFactoryMapping.put( ProtocolCombo.PC_153, new F153( messageLogger, readTimeout, lockReadTimeout,
+                channels ) );
+        protocolToFactoryMapping.put( ProtocolCombo.PC_18, new F18( messageLogger, readTimeout, lockReadTimeout,
+                channels ) );
     }
 
     public MasterClientFactory getFor( int applicationProtocol, int internalProtocol )
     {
-        return protocolToFactoryMapping.get( new ProtocolCombo( applicationProtocol, internalProtocol ) );
+        MasterClientFactory candidate = protocolToFactoryMapping.get( new ProtocolCombo( applicationProtocol,
+                internalProtocol ) );
+        if ( candidate != null ) current = candidate;
+        return candidate;
     }
 
     public MasterClientFactory getDefault()
     {
         return getFor( ProtocolCombo.PC_18.applicationProtocol, ProtocolCombo.PC_18.internalProtocol );
     }
+
+    protected static abstract class StaticMasterClientFactory implements MasterClientFactory
+    {
+        protected final StringLogger stringLogger;
+        protected final int readTimeoutSeconds;
+        protected final int lockReadTimeout;
+        protected final int maxConcurrentChannels;
+
+        StaticMasterClientFactory( StringLogger stringLogger, int readTimeoutSeconds, int lockReadTimeout,
+                int maxConcurrentChannels )
+        {
+            this.stringLogger = stringLogger;
+            this.readTimeoutSeconds = readTimeoutSeconds;
+            this.lockReadTimeout = lockReadTimeout;
+            this.maxConcurrentChannels = maxConcurrentChannels;
+        }
+    }
+
+    public static final class F153 extends StaticMasterClientFactory
+    {
+        public F153( StringLogger stringLogger, int readTimeoutSeconds, int lockReadTimeout, int maxConcurrentChannels )
+        {
+            super( stringLogger, readTimeoutSeconds, lockReadTimeout, maxConcurrentChannels );
+        }
+
+        @Override
+        public MasterClient instantiate( String hostNameOrIp, int port, StoreId storeId )
+        {
+            return new MasterClient153( hostNameOrIp, port, stringLogger, storeId, ConnectionLostHandler.NO_ACTION,
+                    readTimeoutSeconds, lockReadTimeout, maxConcurrentChannels );
+        }
+    };
+
+    public static final class F18 extends StaticMasterClientFactory
+    {
+        public F18( StringLogger stringLogger, int readTimeoutSeconds, int lockReadTimeout, int maxConcurrentChannels )
+        {
+            super( stringLogger, readTimeoutSeconds, lockReadTimeout, maxConcurrentChannels );
+        }
+
+        @Override
+        public MasterClient instantiate( String hostNameOrIp, int port, StoreId storeId )
+        {
+            return new MasterClient18( hostNameOrIp, port, stringLogger, storeId, ConnectionLostHandler.NO_ACTION,
+                    readTimeoutSeconds, lockReadTimeout, maxConcurrentChannels );
+        }
+    };
 }

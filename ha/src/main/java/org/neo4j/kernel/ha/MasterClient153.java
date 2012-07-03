@@ -60,7 +60,7 @@ public class MasterClient153 extends Client<Master> implements Master, MasterCli
 
     /* Version 1 first version
      * Version 2 since 2012-01-24 */
-    static final byte PROTOCOL_VERSION = 2;
+    public static final byte PROTOCOL_VERSION = 2;
 
     static final ObjectSerializer<LockResult> LOCK_SERIALIZER = new ObjectSerializer<LockResult>()
     {

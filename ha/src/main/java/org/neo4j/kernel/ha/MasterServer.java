@@ -40,7 +40,7 @@ import org.neo4j.kernel.impl.util.StringLogger;
  */
 public class MasterServer extends Server<Master, Void>
 {
-    static final int FRAME_LENGTH = Protocol.DEFAULT_FRAME_LENGTH;
+    public static final int FRAME_LENGTH = Protocol.DEFAULT_FRAME_LENGTH;
 
     public MasterServer( Master requestTarget, final int port, StringLogger logger, int maxConcurrentTransactions,
             int oldChannelThreshold, TxChecksumVerifier txVerifier )
