@@ -39,17 +39,17 @@ public class HaSettings
 {
 	@Migrator
 	public static final ConfigurationMigrator migrator = new EnterpriseConfigurationMigrator();
-	
+
     public static final GraphDatabaseSetting.StringSetting coordinators = new GraphDatabaseSetting.StringSetting( "ha.coordinators", ANY, "Must be valid list of host names" );
-    
+
     @Default("20")
     public static final GraphDatabaseSetting.IntegerSetting read_timeout = new GraphDatabaseSetting.IntegerSetting( "ha.read_timeout", "Must be valid timeout in seconds",5,null );
-    
+
     public static final GraphDatabaseSetting.IntegerSetting lock_read_timeout = new GraphDatabaseSetting.IntegerSetting( "ha.lock_read_timeout", "Must be valid timeout in seconds",1,null );
 
     @Default("20")
     public static final GraphDatabaseSetting.IntegerSetting max_concurrent_channels_per_slave = new GraphDatabaseSetting.IntegerSetting( "ha.max_concurrent_channels_per_slave", "Must be valid timeout in seconds",1,null );
-    
+
     public static final IntegerSetting server_id = new GraphDatabaseSetting.IntegerSetting( "ha.server_id", "Must be a valid server id" );
 
     public static final StringSetting server = new StringSetting( "ha.server", ANY, "Must be a valid IP and port to bind to as master" );
@@ -72,48 +72,51 @@ public class HaSettings
     @Default( BranchedDataPolicySetting.keep_all )
     public static final BranchedDataPolicySetting branched_data_policy = new BranchedDataPolicySetting();
 
+    @Default( CompatibilitySetting.DEFAULT )
+    public static final CompatibilitySetting compatibility = new CompatibilitySetting();
+
     @Default( "0" )
     public static final StringSetting pull_interval = new StringSetting( "ha.pull_interval", ANY, "Must be valid interval setting" );
 
-    @Description(   "The amount of slaves the master will ask to replicate a committed transaction. " + 
+    @Description(   "The amount of slaves the master will ask to replicate a committed transaction. " +
                     "The master will not throw an exception on commit if the replication failed." )
     @Default( "1" )
-    public static final IntegerSetting tx_push_factor = new IntegerSetting( "ha.tx_push_factor", "Must be a valid replication factor", 0, null ); 
+    public static final IntegerSetting tx_push_factor = new IntegerSetting( "ha.tx_push_factor", "Must be a valid replication factor", 0, null );
 
-    
-    @Description(   "Push strategy of a transaction to a slave during commit. " + 
-                    " Round robin (\"round_robin\")  " + 
+
+    @Description(   "Push strategy of a transaction to a slave during commit. " +
+                    " Round robin (\"round_robin\")  " +
                     " or fixed (\"fixed\") selecting the slave with highest machine id first" )
     @Default( "fixed" )
     public static final OptionsSetting tx_push_strategy = new TxPushStrategySetting();
-    
+
     public static class TxPushStrategySetting
         extends OptionsSetting
     {
         @Description( "Round robin" )
         public static final String roundRobin = "round_robin";
-    
+
         @Description( "Fixed" )
         public static final String fixed = "fixed";
-    
+
         public TxPushStrategySetting( )
         {
             super( "ha.tx_push_strategy", roundRobin, fixed );
         }
     }
-    
+
     public static final class SlaveUpdateModeSetting
         extends GraphDatabaseSetting.OptionsSetting
     {
         @Description( "Update mode 'sync'" )
         public static final String sync = "sync";
-        
+
         @Description( "Update mode 'async'" )
         public static final String async = "async";
-        
+
         @Description( "Update mode 'none'" )
         public static final String none = "none";
-        
+
         public SlaveUpdateModeSetting(  )
         {
             super( "ha.slave_coordinator_update_mode", sync, async, none );
@@ -138,6 +141,23 @@ public class HaSettings
         public BranchedDataPolicySetting(  )
         {
             super( "ha.branched_data_policy", keep_all, keep_last, keep_none, shutdown );
+        }
+    }
+
+    public static final class CompatibilitySetting extends GraphDatabaseSetting.OptionsSetting
+    {
+        @Description( "No compatibility mode, start up with latest version" )
+        public static final String DEFAULT = "none";
+
+        @Description( "Compatibility with versions 1.6 onwards, currently the latest version" )
+        public static final String C1_6 = "1.6";
+
+        @Description( "Compatibility with version 1.5.3" )
+        public static final String C1_5_3 = "1.5.3";
+
+        public CompatibilitySetting()
+        {
+            super( "ha.compatibility", DEFAULT, C1_6, C1_5_3 );
         }
     }
 }

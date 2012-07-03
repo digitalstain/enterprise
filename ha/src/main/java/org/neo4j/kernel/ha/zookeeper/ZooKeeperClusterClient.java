@@ -32,6 +32,7 @@ import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.ZooKeeper;
 import org.neo4j.helpers.Pair;
+import org.neo4j.kernel.HighlyAvailableGraphDatabase.ClientFactoryProxy;
 import org.neo4j.kernel.configuration.ConfigurationDefaults;
 import org.neo4j.kernel.ha.ClusterClient;
 import org.neo4j.kernel.ha.HaSettings;
@@ -58,11 +59,18 @@ public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements 
     public ZooKeeperClusterClient( String zooKeeperServers, String clusterName )
     {
         this( zooKeeperServers, StringLogger.SYSTEM, clusterName, Integer.parseInt( ConfigurationDefaults.getDefault(
-                HaSettings.zk_session_timeout, HaSettings.class ) ), MasterClientFactory.DEFAULT_FACTORY );
+                HaSettings.zk_session_timeout, HaSettings.class ) ), new ClientFactoryProxy()
+        {
+            @Override
+            public MasterClientFactory getFactory()
+            {
+                return MasterClientFactory.DEFAULT_FACTORY;
+            }
+        } );
     }
 
     public ZooKeeperClusterClient( String zooKeeperServers, StringLogger msgLog, String clusterName,
-            int sessionTimeout, MasterClientFactory factory )
+            int sessionTimeout, ClientFactoryProxy factory )
     {
         super( zooKeeperServers, msgLog, sessionTimeout, factory );
         this.clusterName = clusterName;

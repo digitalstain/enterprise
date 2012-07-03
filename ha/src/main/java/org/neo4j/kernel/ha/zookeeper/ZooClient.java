@@ -62,6 +62,7 @@ import org.neo4j.helpers.Exceptions;
 import org.neo4j.helpers.Pair;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.HaConfig;
+import org.neo4j.kernel.HighlyAvailableGraphDatabase.ClientFactoryProxy;
 import org.neo4j.kernel.InformativeStackTrace;
 import org.neo4j.kernel.SlaveUpdateMode;
 import org.neo4j.kernel.configuration.Config;
@@ -69,7 +70,6 @@ import org.neo4j.kernel.ha.Broker;
 import org.neo4j.kernel.ha.ClusterEventReceiver;
 import org.neo4j.kernel.ha.ConnectionInformation;
 import org.neo4j.kernel.ha.HaSettings;
-import org.neo4j.kernel.ha.MasterClientFactory;
 import org.neo4j.kernel.ha.MasterImpl;
 import org.neo4j.kernel.ha.MasterServer;
 import org.neo4j.kernel.ha.Slave;
@@ -124,9 +124,9 @@ public class ZooClient extends AbstractZooKeeperManager
     private volatile boolean serversRefreshed = true;
 
     public ZooClient( String storeDir, StringLogger stringLogger, Config conf, SlaveDatabaseOperations localDatabase,
-            ClusterEventReceiver clusterReceiver, MasterClientFactory factory )
+            ClusterEventReceiver clusterReceiver, ClientFactoryProxy proxy )
     {
-        super( conf.get( HaSettings.coordinators ), stringLogger, conf.getInteger( zk_session_timeout ), factory );
+        super( conf.get( HaSettings.coordinators ), stringLogger, conf.getInteger( zk_session_timeout ), proxy );
         this.storeDir = storeDir;
         this.conf = conf;
         this.localDatabase = localDatabase;

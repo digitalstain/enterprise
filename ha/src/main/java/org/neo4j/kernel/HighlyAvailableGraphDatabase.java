@@ -156,7 +156,6 @@ public class HighlyAvailableGraphDatabase
     private BranchedDataPolicy branchedDataPolicy;
     private final SlaveUpdateMode slaveUpdateMode;
     private final Caches caches;
-    private volatile MasterClientFactory clientFactory;
     private final MasterClientResolver masterClientResolver;
 
     // This lock is used to safeguard access to internal database
@@ -245,7 +244,7 @@ public class HighlyAvailableGraphDatabase
                 configuration.isSet( HaSettings.lock_read_timeout ) ? configuration.getInteger( HaSettings.lock_read_timeout )
                         : configuration.getInteger( HaSettings.read_timeout ),
                 configuration.getInteger( HaSettings.max_concurrent_channels_per_slave ) );
-        this.clientFactory = masterClientResolver.getFor( 2, 2 );
+        theProxy.clientFactory = masterClientResolver.getFor( 2, 2 );
         // TODO The dependency from BrokerFactory to 'this' is completely broken. Needs rethinking
         this.broker = createBroker();
         this.pullUpdates = false;
@@ -771,7 +770,7 @@ public class HighlyAvailableGraphDatabase
         }
         catch ( IllegalProtocolVersionException e )
         {
-            clientFactory = masterClientResolver.getFor( e.getReceived(), 2 );
+            theProxy.clientFactory = masterClientResolver.getFor( e.getReceived(), 2 );
             throw e;
         }
         long highestLogVersion = highestLogVersion( temp );
@@ -1004,11 +1003,11 @@ public class HighlyAvailableGraphDatabase
             safelyShutdownDb( newDb );
             messageLog.logMessage( "Hey, expected " + e.getExpected() + " but got " + e.getReceived(), true );
             System.out.println( "Hey, expected " + e.getExpected() + " but got " + e.getReceived() );
-            e.printStackTrace();
             if ( masterClientResolver.getFor( e.getReceived(), 2 ) != null )
             {
-                clientFactory = masterClientResolver.getFor( e.getReceived(), 2 );
-                broker = createBroker();
+                System.out.println( "Got new master client" );
+                theProxy.clientFactory = masterClientResolver.getFor( e.getReceived(), 2 );
+                broker.restart();
             }
             throw e;
         }
@@ -1269,7 +1268,6 @@ public class HighlyAvailableGraphDatabase
         internalShutdown( false );
 
         life.shutdown();
-
     }
 
     protected synchronized void close()
@@ -1401,6 +1399,18 @@ public class HighlyAvailableGraphDatabase
         return getMasterServerIfMaster() != null;
     }
 
+    public static class ClientFactoryProxy
+    {
+        volatile MasterClientFactory clientFactory;
+
+        public MasterClientFactory getFactory()
+        {
+            return clientFactory;
+        }
+    }
+
+    private final ClientFactoryProxy theProxy = new ClientFactoryProxy();
+
     protected Broker createBroker()
     {
         return new ZooKeeperBroker( configuration, new ZooClientFactory()
@@ -1409,7 +1419,7 @@ public class HighlyAvailableGraphDatabase
             public ZooClient newZooClient()
             {
                 return new ZooClient( storeDir, messageLog, configuration, /* as SlaveDatabaseOperations for extracting master for tx */
-                slaveOperations, /* as ClusterEventReceiver */slaveOperations, clientFactory );
+                slaveOperations, /* as ClusterEventReceiver */slaveOperations, theProxy );
             }
         } );
     }
@@ -1423,7 +1433,7 @@ public class HighlyAvailableGraphDatabase
     {
         return new ZooKeeperClusterClient( configuration.get( HaSettings.coordinators ), getMessageLog(),
                 configuration.get( HaSettings.cluster_name ),
-                configuration.getInteger( HaSettings.zk_session_timeout ), clientFactory );
+                configuration.getInteger( HaSettings.zk_session_timeout ), theProxy );
     }
 
     // TODO This should be removed. Analyze usages
