@@ -72,9 +72,6 @@ public class HaSettings
     @Default( BranchedDataPolicySetting.keep_all )
     public static final BranchedDataPolicySetting branched_data_policy = new BranchedDataPolicySetting();
 
-    @Default( CompatibilitySetting.DEFAULT )
-    public static final CompatibilitySetting compatibility = new CompatibilitySetting();
-
     @Default( "0" )
     public static final StringSetting pull_interval = new StringSetting( "ha.pull_interval", ANY, "Must be valid interval setting" );
 
@@ -141,23 +138,6 @@ public class HaSettings
         public BranchedDataPolicySetting(  )
         {
             super( "ha.branched_data_policy", keep_all, keep_last, keep_none, shutdown );
-        }
-    }
-
-    public static final class CompatibilitySetting extends GraphDatabaseSetting.OptionsSetting
-    {
-        @Description( "No compatibility mode, start up with latest version" )
-        public static final String DEFAULT = "none";
-
-        @Description( "Compatibility with versions 1.6 onwards, currently the latest version" )
-        public static final String C1_6 = "1.6";
-
-        @Description( "Compatibility with version 1.5.3" )
-        public static final String C1_5_3 = "1.5.3";
-
-        public CompatibilitySetting()
-        {
-            super( "ha.compatibility", DEFAULT, C1_6, C1_5_3 );
         }
     }
 }

@@ -244,7 +244,7 @@ public class HighlyAvailableGraphDatabase
                 configuration.isSet( HaSettings.lock_read_timeout ) ? configuration.getInteger( HaSettings.lock_read_timeout )
                         : configuration.getInteger( HaSettings.read_timeout ),
                 configuration.getInteger( HaSettings.max_concurrent_channels_per_slave ) );
-        theProxy.clientFactory = masterClientResolver.getFor( 2, 2 );
+        theProxy.clientFactory = masterClientResolver.getDefault();
         // TODO The dependency from BrokerFactory to 'this' is completely broken. Needs rethinking
         this.broker = createBroker();
         this.pullUpdates = false;
