@@ -696,9 +696,12 @@ public class ZooClient extends AbstractZooKeeperManager
         {
             synchronized ( this )
             {
-                flushing = true;
-                updater = new SynchronousTxIdUpdater();
-                updater.init();
+                if ( !flushing )
+                {
+                    flushing = true;
+                    updater = new SynchronousTxIdUpdater();
+                    updater.init();
+                }
             }
         }
     }
@@ -715,9 +718,12 @@ public class ZooClient extends AbstractZooKeeperManager
         {
             synchronized ( this )
             {
-                flushing = false;
-                updater = new NoUpdateTxIdUpdater();
-                updater.init();
+                if ( flushing )
+                {
+                    flushing = false;
+                    updater = new NoUpdateTxIdUpdater();
+                    updater.init();
+                }
             }
         }
     }
