@@ -97,7 +97,7 @@ public class ServerUtil
         {
             try
             {
-                appliedTransactions[i++] = RequestContext.Tx.lastAppliedTx( ds.getName(),
+                appliedTransactions[i++] = RequestContext.lastAppliedTx( ds.getName(),
                         ds.getXaContainer().getResourceManager().rotateLogicalLog() );
             }
             catch ( IOException e )

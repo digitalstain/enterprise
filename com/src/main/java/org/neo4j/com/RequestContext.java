@@ -57,10 +57,11 @@ public final class RequestContext
             return dataSourceName + "/" + txId;
         }
 
-        public static Tx lastAppliedTx( String dataSourceName, long txId )
-        {
-            return new Tx( dataSourceName, txId );
-        }
+    }
+
+    public static Tx lastAppliedTx( String dataSourceName, long txId )
+    {
+        return new Tx( dataSourceName, txId );
     }
 
     private final int machineId;

@@ -44,7 +44,6 @@ import javax.transaction.TransactionManager;
 import org.neo4j.backup.OnlineBackupSettings;
 import org.neo4j.com.ComException;
 import org.neo4j.com.IllegalProtocolVersionException;
-import org.neo4j.com.MismatchingVersionHandler;
 import org.neo4j.com.RequestContext;
 import org.neo4j.com.RequestContext.Tx;
 import org.neo4j.com.Response;
@@ -758,8 +757,7 @@ public class HighlyAvailableGraphDatabase
     {
         getMessageLog().logMessage( "Copying store from master" );
         String temp = getClearedTempDir().getAbsolutePath();
-        Response<Void> response = null;
-        response = master.first().copyStore( emptyContext(), new ToFileStoreWriter( temp ) );
+        Response<Void> response = master.first().copyStore( emptyContext(), new ToFileStoreWriter( temp ) );
         long highestLogVersion = highestLogVersion( temp );
         if( highestLogVersion > -1 )
         {
@@ -1324,7 +1322,9 @@ public class HighlyAvailableGraphDatabase
             }
             catch ( IllegalProtocolVersionException pe )
             {
-                getMessageLog().logMessage( "Hey, expected " + pe.getExpected() + " but got " + pe.getReceived(), e );
+                getMessageLog().logMessage(
+                        "Got wrong protocol version during newMaster, expected " + pe.getExpected() + " but got "
+                                + pe.getReceived(), e );
                 broker.restart();
                 e = pe;
                 cause = pe;
@@ -1582,7 +1582,7 @@ public class HighlyAvailableGraphDatabase
                     {
                         master = dataSource.getMasterForCommittedTx( txId );
                     }
-                    txs[i++] = RequestContext.Tx.lastAppliedTx( dataSource.getName(), txId );
+                    txs[i++] = RequestContext.lastAppliedTx( dataSource.getName(), txId );
                 }
                 return new RequestContext( startupTime, machineId, eventIdentifier, txs, master.first(), master.other() );
             }
@@ -1662,15 +1662,6 @@ public class HighlyAvailableGraphDatabase
             {
                 throw new ComException( "Master id not found for tx:" + tx, e );
             }
-        }
-    }
-
-    private final class ClientChangingMismatchingVersionHandler implements MismatchingVersionHandler
-    {
-        @Override
-        public void versionMismatched( int expected, int received )
-        {
-            messageLog.logMessage( "Hey, expected " + expected + " but got " + received );
         }
     }
 

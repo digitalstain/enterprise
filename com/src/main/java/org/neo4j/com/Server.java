@@ -497,7 +497,7 @@ public abstract class Server<T, R> extends Protocol implements ChannelPipelineFa
         for ( int i = 0; i < txsSize; i++ )
         {
             String ds = readString( buffer );
-            Tx tx = RequestContext.Tx.lastAppliedTx( ds, buffer.readLong() );
+            Tx tx = RequestContext.lastAppliedTx( ds, buffer.readLong() );
             lastAppliedTransactions[i] = tx;
 
             // Only perform checksum checks on the neo data source.
