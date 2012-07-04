@@ -87,7 +87,6 @@ public class ZooClient extends AbstractZooKeeperManager
 {
     static final String MASTER_NOTIFY_CHILD = "master-notify";
     static final String MASTER_REBOUND_CHILD = "master-rebound";
-    static final String COMPATIBILITY_CHILD = "compatibility";
 
     private final ZooKeeper zooKeeper;
     private final int machineId;
@@ -526,10 +525,10 @@ public class ZooClient extends AbstractZooKeeperManager
     private void writeHaServerConfig() throws InterruptedException, KeeperException
     {
         // Make sure the HA server root is created
-        String path = rootPath + "/" + HA_SERVERS_CHILD;
+        String serverRootPath = rootPath + "/" + HA_SERVERS_CHILD;
         try
         {
-            zooKeeper.create( path, new byte[0],
+            zooKeeper.create( serverRootPath, new byte[0],
                     ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT );
         }
         catch ( KeeperException e )
@@ -540,13 +539,32 @@ public class ZooClient extends AbstractZooKeeperManager
             }
         }
 
-        // Write the HA server config.
-        String machinePath = path + "/" + machineId;
-        byte[] data = haServerAsData();
+        // Make sure the compatibility node is present
+        String compatibilityPath = rootPath + "/" + COMPATIBILITY_CHILD;
         try
         {
-            zooKeeper.create( machinePath, data,
-                    ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL );
+            zooKeeper.create( compatibilityPath, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT );
+        }
+        catch ( KeeperException e )
+        {
+            if ( e.code() != KeeperException.Code.NODEEXISTS )
+            {
+                throw e;
+            }
+        }
+
+        // Write the HA server config.
+        String machinePath = serverRootPath + "/" + machineId;
+        String compatibilityMachinePath = compatibilityPath + "/" + machineId;
+        byte[] data = haServerAsData();
+        boolean compatCreated = false;
+        boolean machineCreated = false;
+        try
+        {
+            zooKeeper.create( compatibilityMachinePath, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL );
+            compatCreated = true;
+            zooKeeper.create( machinePath, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL );
+            machineCreated = true;
         }
         catch ( KeeperException e )
         {
@@ -557,13 +575,14 @@ public class ZooClient extends AbstractZooKeeperManager
             msgLog.logMessage( "HA server info already present, trying again" );
             try
             {
-                zooKeeper.delete( machinePath, -1 );
+                if ( compatCreated ) zooKeeper.delete( compatibilityMachinePath, -1 );
+                if ( machineCreated ) zooKeeper.delete( machinePath, -1 );
             }
             catch ( KeeperException ee )
             {
                 if ( ee.code() != KeeperException.Code.NONODE )
                 {
-                    msgLog.logMessage( "Unable to delete " + machinePath, ee );
+                    msgLog.logMessage( "Unable to delete " + ee.getPath(), ee );
                 }
             }
             finally
@@ -686,7 +705,7 @@ public class ZooClient extends AbstractZooKeeperManager
 
     private void startFlushing()
     {
-        if ( checkCompatibilityNodeExists() )
+        if ( checkCompatibilityMode() )
         {
             msgLog.logMessage( "Discovered compatibility node, will remain in compatibility mode until the node is removed" );
             updater = new CompatibilitySlaveOnlyTxIdUpdater();
@@ -708,7 +727,7 @@ public class ZooClient extends AbstractZooKeeperManager
 
     private void stopFlushing()
     {
-        if ( checkCompatibilityNodeExists() )
+        if ( checkCompatibilityMode() )
         {
             msgLog.logMessage( "Discovered compatibility node, will remain in compatibility mode until the node is removed" );
             updater = new CompatibilitySlaveOnlyTxIdUpdater();
@@ -818,15 +837,21 @@ public class ZooClient extends AbstractZooKeeperManager
         return machineId == this.machineId ? asMachine : super.getHaServer( machineId, wait );
     }
 
-    private boolean checkCompatibilityNodeExists()
+    private boolean checkCompatibilityMode()
     {
         try
         {
-            return zooKeeper.exists( getRoot() + "/" + COMPATIBILITY_CHILD, false ) != null;
+            int totalCount = getNumberOfServers();
+            int myVersionCount = zooKeeper.getChildren( getRoot() + "/" + COMPATIBILITY_CHILD, false ).size();
+            boolean result = myVersionCount <= totalCount - 1;
+            msgLog.logMessage( "Checking compatibility mode, read " + totalCount + " as all machines, "
+                               + myVersionCount + " as myVersion machines. Based on that I return " + result );
+            return result;
+
         }
         catch ( Exception e )
         {
-            msgLog.logMessage( "Tried to discover if compatibility node exists, got this exception instead", e );
+            msgLog.logMessage( "Tried to discover if we are in compatibility mode, got this exception instead", e );
             throw new RuntimeException( e );
         }
     }
@@ -1009,7 +1034,7 @@ public class ZooClient extends AbstractZooKeeperManager
                             subscribeToDataChangeWatcher( MASTER_REBOUND_CHILD );
                         }
                         keeperState = KeeperState.SyncConnected;
-                        if ( checkCompatibilityNodeExists() )
+                        if ( checkCompatibilityMode() )
                         {
                             msgLog.logMessage( "Discovered compatibility node, will remain in compatibility mode until the node is removed" );
                             updater = new CompatibilitySlaveOnlyTxIdUpdater();

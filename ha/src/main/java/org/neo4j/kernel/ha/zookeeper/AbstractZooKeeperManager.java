@@ -54,6 +54,7 @@ public abstract class AbstractZooKeeperManager
 {
     protected static final String HA_SERVERS_CHILD = "ha-servers";
     protected static final String FLUSH_REQUESTED_CHILD = "flush-requested";
+    protected static final String COMPATIBILITY_CHILD = "compatibility-1.8";
 
     protected static final int STOP_FLUSHING = -6;
 
@@ -302,13 +303,13 @@ public abstract class AbstractZooKeeperManager
             }
 
             writeFlush( getMyMachineId() );
-            
+
             long endTime = System.currentTimeMillis()+sessionTimeout;
 OUTER:      do
             {
                 Thread.sleep( 100 );
                 Map<Integer, ZooKeeperMachine> result = new HashMap<Integer, ZooKeeperMachine>();
-    
+
                 String root = getRoot();
                 List<String> children = getZooKeeper( true ).getChildren( root, false );
                 for ( String child : children )
@@ -318,7 +319,7 @@ OUTER:      do
                     {   // This was some kind of other ZK node, just ignore
                         continue;
                     }
-    
+
                     try
                     {
                         int id = parsedChild.first();
@@ -405,6 +406,11 @@ OUTER:      do
     protected Iterable<Machine> getHaServers()
     {
         return haServersCache.values();
+    }
+
+    protected int getNumberOfServers()
+    {
+        return haServersCache.size();
     }
 
     protected Machine readHaServer( int machineId, boolean wait )
