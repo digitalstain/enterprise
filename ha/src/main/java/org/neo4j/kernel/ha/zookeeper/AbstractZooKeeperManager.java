@@ -184,7 +184,6 @@ public abstract class AbstractZooKeeperManager
             {
                 // If there is a master and it is not me
                 masterClient = getMasterClientToMachine( master );
-                System.out.println( "Got new masterClient " + masterClient.getClass() );
             }
             cachedMaster = Pair.<Master, Machine>of( masterClient, (Machine) master );
         }

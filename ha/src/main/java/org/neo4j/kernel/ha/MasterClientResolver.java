@@ -34,7 +34,6 @@ public class MasterClientResolver implements MasterClientFactory, MismatchingVer
     @Override
     public MasterClient instantiate( String hostNameOrIp, int port, StoreId storeId )
     {
-        System.out.println( "was asked to instantiate " + current.getClass() );
         MasterClient result = current.instantiate( hostNameOrIp, port, storeId );
         result.addMismatchingVersionHandler( this );
         return result;
@@ -43,9 +42,7 @@ public class MasterClientResolver implements MasterClientFactory, MismatchingVer
     @Override
     public void versionMismatched( int expected, int received )
     {
-        System.out.println( "Got mismatch, expected " + expected + ", received " + received );
         getFor( received, 2 );
-        System.out.println( "So i instantiated " + current.getClass() );
     }
 
     private static final class ProtocolCombo
@@ -99,6 +96,10 @@ public class MasterClientResolver implements MasterClientFactory, MismatchingVer
     {
         MasterClientFactory candidate = protocolToFactoryMapping.get( new ProtocolCombo( applicationProtocol,
                 internalProtocol ) );
+        /*
+         * There is the possibility that we got a protocol we do not recognize, such as a slave talking to a SlaveServer.
+         * In this case the proper action is no action, just keep the old version around.
+         */
         if ( candidate != null ) current = candidate;
         return candidate;
     }
