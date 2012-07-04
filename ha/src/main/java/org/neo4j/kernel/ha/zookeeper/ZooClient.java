@@ -841,6 +841,7 @@ public class ZooClient extends AbstractZooKeeperManager
     {
         try
         {
+            refreshHaServers();
             int totalCount = getNumberOfServers();
             int myVersionCount = zooKeeper.getChildren( getRoot() + "/" + COMPATIBILITY_CHILD, false ).size();
             boolean result = myVersionCount <= totalCount - 1;
@@ -1201,7 +1202,8 @@ public class ZooClient extends AbstractZooKeeperManager
         public void init()
         {
             writeData( 0, -1 );
-            msgLog.logMessage( "Stopping flushing of txids to zk, while at txid " + committedTx );
+            msgLog.logMessage( "Set to defaults (0 for txid, -1 for master) since we are running in compatilibility mode, while at txid "
+                               + committedTx );
         }
     }
 
