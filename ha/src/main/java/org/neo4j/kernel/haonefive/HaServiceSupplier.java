@@ -22,7 +22,7 @@ package org.neo4j.kernel.haonefive;
 import javax.transaction.Transaction;
 
 import org.neo4j.com.Response;
-import org.neo4j.com.SlaveContext;
+import org.neo4j.com.RequestContext;
 import org.neo4j.helpers.Triplet;
 import org.neo4j.kernel.ha.Master;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
@@ -35,13 +35,13 @@ public interface HaServiceSupplier
 {
     Master getMaster();
 
-    SlaveContext getSlaveContext( int eventIdentifier );
+    RequestContext getRequestContext( int eventIdentifier );
 
-    SlaveContext getSlaveContext( XaDataSource dataSource );
+    RequestContext getRequestContext( XaDataSource dataSource );
     
-    SlaveContext getSlaveContext();
+    RequestContext getRequestContext();
     
-    SlaveContext getEmptySlaveContext();
+    RequestContext getEmptyRequestContext();
     
     void receive( Response<?> response );
 

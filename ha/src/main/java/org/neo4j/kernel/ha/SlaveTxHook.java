@@ -42,7 +42,7 @@ public class SlaveTxHook implements TxHook
     {
         try
         {
-            databaseOperations.receive( broker.getMaster().first().initializeTx( databaseOperations.getSlaveContext( eventIdentifier ) ) );
+            databaseOperations.receive( broker.getMaster().first().initializeTx( databaseOperations.getRequestContext( eventIdentifier ) ) );
         }
         catch ( RuntimeException e )
         {
@@ -61,7 +61,7 @@ public class SlaveTxHook implements TxHook
         try
         {
             databaseOperations.receive( broker.getMaster().first().finishTransaction(
-                    databaseOperations.getSlaveContext( eventIdentifier ), success ) );
+                    databaseOperations.getRequestContext( eventIdentifier ), success ) );
         }
         catch ( RuntimeException e )
         {

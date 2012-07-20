@@ -37,6 +37,8 @@ import org.neo4j.kernel.ha.AbstractBroker;
 import org.neo4j.kernel.ha.ConnectionInformation;
 import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.Master;
+import org.neo4j.kernel.ha.Slave;
+import org.neo4j.kernel.ha.SlaveDatabaseOperations;
 import org.neo4j.kernel.ha.shell.ZooClientFactory;
 import org.neo4j.kernel.ha.zookeeper.AbstractZooKeeperManager.WaitMode;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
@@ -191,6 +193,12 @@ public class ZooKeeperBroker extends AbstractBroker
     {
         return getZooClient().getMasterFromZooKeeper( true, allowChange );
     }
+    
+    @Override
+    public Slave[] getSlaves()
+    {
+        return getZooClient().getSlavesFromZooKeeper();
+    }
 
     @Override
     public Machine getMasterExceptMyself()
@@ -203,6 +211,12 @@ public class ZooKeeperBroker extends AbstractBroker
     public Object instantiateMasterServer( GraphDatabaseAPI graphDb )
     {
         return zooClient.instantiateMasterServer( graphDb );
+    }
+    
+    @Override
+    public Object instantiateSlaveServer( GraphDatabaseAPI graphDb, SlaveDatabaseOperations ops )
+    {
+        return zooClient.instantiateSlaveServer( graphDb, this, ops );
     }
 
     @Override

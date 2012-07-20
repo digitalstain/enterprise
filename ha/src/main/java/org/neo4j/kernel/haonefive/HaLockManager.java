@@ -40,7 +40,7 @@ import org.neo4j.kernel.info.LockInfo;
 public class HaLockManager implements LockManager
 {
     private ComRequestSupport requestSupport;
-    private final LockManager local;
+    private final LockManagerImpl local;
     private Master master;
     private final TransactionSupport transactionSupport;
 
@@ -66,7 +66,13 @@ public class HaLockManager implements LockManager
             local.getReadLock( resource );
         }
     }
-    
+
+    @Override
+    public void getReadLock( Object resource, Transaction tx ) throws DeadlockDetectedException, IllegalResourceException
+    {
+        local.getReadLock( resource, tx );
+    }
+
     void masterChanged( Master master )
     {
         this.master = master;
@@ -78,17 +84,17 @@ public class HaLockManager implements LockManager
         if ( resource instanceof Node )
         {
             transactionSupport.makeSureTxHasBeenInitialized();
-            response = master.acquireNodeReadLock( requestSupport.getSlaveContext(), ((Node)resource).getId() );
+            response = master.acquireNodeReadLock( requestSupport.getRequestContext(), ((Node)resource).getId() );
         }
         else if ( resource instanceof Relationship )
         {
             transactionSupport.makeSureTxHasBeenInitialized();
-            response = master.acquireRelationshipReadLock( requestSupport.getSlaveContext(), ((Relationship)resource).getId() );
+            response = master.acquireRelationshipReadLock( requestSupport.getRequestContext(), ((Relationship)resource).getId() );
         }
         else if ( resource instanceof GraphProperties )
         {
             transactionSupport.makeSureTxHasBeenInitialized();
-            response = master.acquireGraphReadLock( requestSupport.getSlaveContext() );
+            response = master.acquireGraphReadLock( requestSupport.getRequestContext() );
         }
         else
         {
@@ -124,24 +130,30 @@ public class HaLockManager implements LockManager
             local.getWriteLock( resource );
         }
     }
-    
+
+    @Override
+    public void getWriteLock( Object resource, Transaction tx ) throws DeadlockDetectedException, IllegalResourceException
+    {
+        local.getWriteLock( resource, tx );
+    }
+
     private boolean getWriteLockOnMaster( Object resource )
     {
         Response<LockResult> response = null;
         if ( resource instanceof Node )
         {
             transactionSupport.makeSureTxHasBeenInitialized();
-            response = master.acquireNodeWriteLock( requestSupport.getSlaveContext(), ((Node)resource).getId() );
+            response = master.acquireNodeWriteLock( requestSupport.getRequestContext(), ((Node)resource).getId() );
         }
         else if ( resource instanceof Relationship )
         {
             transactionSupport.makeSureTxHasBeenInitialized();
-            response = master.acquireRelationshipWriteLock( requestSupport.getSlaveContext(), ((Relationship)resource).getId() );
+            response = master.acquireRelationshipWriteLock( requestSupport.getRequestContext(), ((Relationship)resource).getId() );
         }
         else if ( resource instanceof GraphProperties )
         {
             transactionSupport.makeSureTxHasBeenInitialized();
-            response = master.acquireGraphWriteLock( requestSupport.getSlaveContext() );
+            response = master.acquireGraphWriteLock( requestSupport.getRequestContext() );
         }
         else
         {

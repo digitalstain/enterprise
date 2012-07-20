@@ -415,6 +415,18 @@ public class ClusterMockTest
                         }, time );
         }
 
+        public ClusterTestScriptDSL sleep( final int sleepTime )
+        {
+            return addAction( new ClusterAction()
+                        {
+                            @Override
+                            public void run()
+                            {
+                                logger.getLogger().info( "Slept for "+ sleepTime );
+                            }
+                        }, sleepTime );
+        }
+
         public ClusterTestScriptDSL message( int time, final String msg )
         {
             return addAction( new ClusterAction()

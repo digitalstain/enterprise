@@ -45,7 +45,7 @@ public class SlaveRelationshipTypeCreator implements RelationshipTypeCreator
         {
             int eventIdentifier = ((TxManager) txManager).getEventIdentifier();
             return databaseOperations.receive( broker.getMaster().first().createRelationshipType(
-                    databaseOperations.getSlaveContext( eventIdentifier ), name ) );
+                    databaseOperations.getRequestContext( eventIdentifier ), name ) );
         }
         catch ( RuntimeException e )
         {

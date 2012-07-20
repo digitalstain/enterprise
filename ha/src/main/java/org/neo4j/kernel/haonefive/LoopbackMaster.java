@@ -23,7 +23,7 @@ import java.io.IOException;
 
 import org.neo4j.com.ResourceReleaser;
 import org.neo4j.com.Response;
-import org.neo4j.com.SlaveContext;
+import org.neo4j.com.RequestContext;
 import org.neo4j.com.StoreWriter;
 import org.neo4j.com.TransactionStream;
 import org.neo4j.com.TxExtractor;
@@ -77,69 +77,69 @@ public class LoopbackMaster implements Master
     }
 
     @Override
-    public Response<Integer> createRelationshipType( SlaveContext context, String name )
+    public Response<Integer> createRelationshipType( RequestContext context, String name )
     {
         int id = relationshipTypeCreator.getOrCreate( txManager, entityIdGenerator, persistenceManager, relationshipTypeHolder, name );
         return emptyResponse( id );
     }
 
     @Override
-    public Response<Void> initializeTx( SlaveContext context )
+    public Response<Void> initializeTx( RequestContext context )
     {
         return emptyResponse( null );
     }
 
     @Override
-    public Response<LockResult> acquireNodeWriteLock( SlaveContext context, long... nodes )
+    public Response<LockResult> acquireNodeWriteLock( RequestContext context, long... nodes )
     {
         return emptyLockResponse();
     }
 
     @Override
-    public Response<LockResult> acquireNodeReadLock( SlaveContext context, long... nodes )
+    public Response<LockResult> acquireNodeReadLock( RequestContext context, long... nodes )
     {
         return emptyLockResponse();
     }
 
     @Override
-    public Response<LockResult> acquireGraphWriteLock( SlaveContext context )
+    public Response<LockResult> acquireGraphWriteLock( RequestContext context )
     {
         return emptyLockResponse();
     }
 
     @Override
-    public Response<LockResult> acquireGraphReadLock( SlaveContext context )
+    public Response<LockResult> acquireGraphReadLock( RequestContext context )
     {
         return emptyLockResponse();
     }
 
     @Override
-    public Response<LockResult> acquireRelationshipWriteLock( SlaveContext context, long... relationships )
+    public Response<LockResult> acquireRelationshipWriteLock( RequestContext context, long... relationships )
     {
         return emptyLockResponse();
     }
 
     @Override
-    public Response<LockResult> acquireRelationshipReadLock( SlaveContext context, long... relationships )
+    public Response<LockResult> acquireRelationshipReadLock( RequestContext context, long... relationships )
     {
         return emptyLockResponse();
     }
 
     @Override
-    public Response<Long> commitSingleResourceTransaction( SlaveContext context, String resource, TxExtractor txGetter )
+    public Response<Long> commitSingleResourceTransaction( RequestContext context, String resource, TxExtractor txGetter )
     {
         long txId = TxIdGenerator.DEFAULT.generate( dsManager.getXaDataSource( resource ), context.getEventIdentifier() );
         return emptyResponse( txId );
     }
 
     @Override
-    public Response<Void> finishTransaction( SlaveContext context, boolean success )
+    public Response<Void> finishTransaction( RequestContext context, boolean success )
     {
         return emptyResponse( null );
     }
 
     @Override
-    public Response<Void> pullUpdates( SlaveContext context )
+    public Response<Void> pullUpdates( RequestContext context )
     {
         return emptyResponse( null );
     }
@@ -159,13 +159,13 @@ public class LoopbackMaster implements Master
     }
 
     @Override
-    public Response<Void> copyStore( SlaveContext context, StoreWriter writer )
+    public Response<Void> copyStore( RequestContext context, StoreWriter writer )
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Response<Void> copyTransactions( SlaveContext context, String dsName, long startTxId, long endTxId )
+    public Response<Void> copyTransactions( RequestContext context, String dsName, long startTxId, long endTxId )
     {
         throw new UnsupportedOperationException();
     }
@@ -176,15 +176,21 @@ public class LoopbackMaster implements Master
     }
 
     @Override
-    public Response<LockResult> acquireIndexWriteLock( SlaveContext context, String index, String key )
+    public Response<LockResult> acquireIndexWriteLock( RequestContext context, String index, String key )
     {
         return emptyLockResponse();
     }
 
     @Override
-    public Response<LockResult> acquireIndexReadLock( SlaveContext context, String index, String key )
+    public Response<LockResult> acquireIndexReadLock( RequestContext context, String index, String key )
     {
         return emptyLockResponse();
+    }
+
+    @Override
+    public Response<Void> pushTransaction( RequestContext context, String resourceName, long tx )
+    {
+        return emptyResponse( null );
     }
 
     private <T> Response<T> emptyResponse( T responseValue )

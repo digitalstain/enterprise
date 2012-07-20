@@ -19,17 +19,17 @@
  */
 package org.neo4j.kernel.haonefive;
 
+import org.neo4j.com.RequestContext;
 import org.neo4j.com.Response;
-import org.neo4j.com.SlaveContext;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 
 public interface ComRequestSupport
 {
-    SlaveContext getSlaveContext( int eventIdentifier );
+    RequestContext getRequestContext( int eventIdentifier );
 
-    SlaveContext getSlaveContext( XaDataSource dataSource );
+    RequestContext getRequestContext( XaDataSource dataSource );
     
-    SlaveContext getSlaveContext();
+    RequestContext getRequestContext();
     
     void receive( Response<?> response );
 }

@@ -47,7 +47,7 @@ public class HaRelationshipTypeCreator implements RelationshipTypeCreator
     public int getOrCreate( TransactionManager txManager, EntityIdGenerator idGenerator,
             PersistenceManager persistence, RelationshipTypeHolder relTypeHolder, String name )
     {
-        Response<Integer> response = master.createRelationshipType( requestSupport.getSlaveContext(), name );
+        Response<Integer> response = master.createRelationshipType( requestSupport.getRequestContext(), name );
         requestSupport.receive( response );
         return response.response().intValue();
     }

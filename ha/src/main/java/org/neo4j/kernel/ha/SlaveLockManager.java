@@ -23,16 +23,16 @@ import java.util.List;
 
 import javax.transaction.Transaction;
 
+import org.neo4j.com.RequestContext;
 import org.neo4j.com.Response;
-import org.neo4j.com.SlaveContext;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.kernel.DeadlockDetectedException;
 import org.neo4j.kernel.impl.core.GraphProperties;
 import org.neo4j.kernel.impl.core.NodeManager.IndexLock;
 import org.neo4j.kernel.impl.transaction.IllegalResourceException;
-import org.neo4j.kernel.impl.transaction.LockManager;
 import org.neo4j.kernel.impl.transaction.LockManagerImpl;
+import org.neo4j.kernel.impl.transaction.LockManager;
 import org.neo4j.kernel.impl.transaction.LockNotFoundException;
 import org.neo4j.kernel.impl.transaction.RagManager;
 import org.neo4j.kernel.impl.transaction.TxHook;
@@ -45,7 +45,7 @@ public class SlaveLockManager implements LockManager
     private final TxManager tm;
     private final SlaveDatabaseOperations databaseOperations;
     private final TxHook txHook;
-    private final LockManager local;
+    private final LockManagerImpl local;
 
     public SlaveLockManager( RagManager ragManager, TxManager tm, TxHook txHook, Broker broker,
             SlaveDatabaseOperations databaseOperations )
@@ -105,7 +105,13 @@ public class SlaveLockManager implements LockManager
     }
 
     @Override
-    public void getReadLock( Object resource ) throws DeadlockDetectedException,
+    public void getReadLock( Object resource ) throws DeadlockDetectedException, IllegalResourceException
+    {
+        local.getReadLock( resource );
+    }
+
+    @Override
+    public void getReadLock( Object resource, Transaction tx ) throws DeadlockDetectedException,
             IllegalResourceException
     {
         LockGrabber grabber = null;
@@ -118,7 +124,7 @@ public class SlaveLockManager implements LockManager
         {
             if ( grabber == null )
             {
-                local.getReadLock( resource );
+                local.getReadLock( resource, tx );
                 return;
             }
 
@@ -128,11 +134,11 @@ public class SlaveLockManager implements LockManager
             {
                 int eventIdentifier = getLocalTxId();
                 result = databaseOperations.receive( grabber.acquireLock( broker.getMaster().first(),
-                        databaseOperations.getSlaveContext( eventIdentifier ), resource ) );
+                        databaseOperations.getRequestContext( eventIdentifier ), resource ) );
                 switch ( result.getStatus() )
                 {
                 case OK_LOCKED:
-                    local.getReadLock( resource );
+                    local.getReadLock( resource, tx );
                     return;
                 case DEAD_LOCKED:
                     throw new DeadlockDetectedException( result.getDeadlockMessage() );
@@ -147,6 +153,12 @@ public class SlaveLockManager implements LockManager
         }
     }
 
+    @Override
+    public void getWriteLock( Object resource ) throws DeadlockDetectedException, IllegalResourceException
+    {
+        local.getWriteLock( resource );
+    }
+
     private void initializeTxIfFirst()
     {
         // The main point of initializing transaction (for HA) is in TransactionImpl, so this is
@@ -156,7 +168,7 @@ public class SlaveLockManager implements LockManager
     }
 
     @Override
-    public void getWriteLock( Object resource ) throws DeadlockDetectedException,
+    public void getWriteLock( Object resource, Transaction tx ) throws DeadlockDetectedException,
             IllegalResourceException
     {
         // Code copied from getReadLock. Fix!
@@ -170,7 +182,7 @@ public class SlaveLockManager implements LockManager
         {
             if ( grabber == null )
             {
-                local.getWriteLock( resource );
+                local.getWriteLock( resource, tx );
                 return;
             }
 
@@ -180,11 +192,11 @@ public class SlaveLockManager implements LockManager
             {
                 int eventIdentifier = getLocalTxId();
                 result = databaseOperations.receive( grabber.acquireLock( broker.getMaster().first(),
-                        databaseOperations.getSlaveContext( eventIdentifier ), resource ) );
+                        databaseOperations.getRequestContext( eventIdentifier ), resource ) );
                 switch ( result.getStatus() )
                 {
                 case OK_LOCKED:
-                    local.getWriteLock( resource );
+                    local.getWriteLock( resource, tx );
                     return;
                 case DEAD_LOCKED:
                     throw new DeadlockDetectedException( result.getDeadlockMessage() );
@@ -208,7 +220,7 @@ public class SlaveLockManager implements LockManager
         NODE_READ
         {
             @Override
-            Response<LockResult> acquireLock( Master master, SlaveContext context, Object resource )
+            Response<LockResult> acquireLock( Master master, RequestContext context, Object resource )
             {
                 return master.acquireNodeReadLock( context, ((Node)resource).getId() );
             }
@@ -216,7 +228,7 @@ public class SlaveLockManager implements LockManager
         NODE_WRITE
         {
             @Override
-            Response<LockResult> acquireLock( Master master, SlaveContext context, Object resource )
+            Response<LockResult> acquireLock( Master master, RequestContext context, Object resource )
             {
                 return master.acquireNodeWriteLock( context, ((Node)resource).getId() );
             }
@@ -224,7 +236,7 @@ public class SlaveLockManager implements LockManager
         RELATIONSHIP_READ
         {
             @Override
-            Response<LockResult> acquireLock( Master master, SlaveContext context, Object resource )
+            Response<LockResult> acquireLock( Master master, RequestContext context, Object resource )
             {
                 return master.acquireRelationshipReadLock( context, ((Relationship)resource).getId() );
             }
@@ -232,7 +244,7 @@ public class SlaveLockManager implements LockManager
         RELATIONSHIP_WRITE
         {
             @Override
-            Response<LockResult> acquireLock( Master master, SlaveContext context, Object resource )
+            Response<LockResult> acquireLock( Master master, RequestContext context, Object resource )
             {
                 return master.acquireRelationshipWriteLock( context, ((Relationship)resource).getId() );
             }
@@ -240,7 +252,7 @@ public class SlaveLockManager implements LockManager
         GRAPH_READ
         {
             @Override
-            Response<LockResult> acquireLock( Master master, SlaveContext context, Object resource )
+            Response<LockResult> acquireLock( Master master, RequestContext context, Object resource )
             {
                 return master.acquireGraphReadLock( context );
             }
@@ -248,7 +260,7 @@ public class SlaveLockManager implements LockManager
         GRAPH_WRITE
         {
             @Override
-            Response<LockResult> acquireLock( Master master, SlaveContext context, Object resource )
+            Response<LockResult> acquireLock( Master master, RequestContext context, Object resource )
             {
                 return master.acquireGraphWriteLock( context );
             }
@@ -256,7 +268,7 @@ public class SlaveLockManager implements LockManager
         INDEX_WRITE
         {
             @Override
-            Response<LockResult> acquireLock( Master master, SlaveContext context, Object resource )
+            Response<LockResult> acquireLock( Master master, RequestContext context, Object resource )
             {
                 IndexLock lock = (IndexLock) resource;
                 return master.acquireIndexWriteLock( context, lock.getIndex(), lock.getKey() );
@@ -265,13 +277,13 @@ public class SlaveLockManager implements LockManager
         INDEX_READ
         {
             @Override
-            Response<LockResult> acquireLock( Master master, SlaveContext context, Object resource )
+            Response<LockResult> acquireLock( Master master, RequestContext context, Object resource )
             {
                 IndexLock lock = (IndexLock) resource;
                 return master.acquireIndexReadLock( context, lock.getIndex(), lock.getKey() );
             }
         };
 
-        abstract Response<LockResult> acquireLock( Master master, SlaveContext context, Object resource );
+        abstract Response<LockResult> acquireLock( Master master, RequestContext context, Object resource );
     }
 }

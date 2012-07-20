@@ -23,7 +23,7 @@ import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static junit.framework.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.neo4j.com.SlaveContext.lastAppliedTx;
+import static org.neo4j.com.RequestContext.lastAppliedTx;
 import static org.neo4j.helpers.Exceptions.launderedException;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
 import static org.neo4j.kernel.configuration.Config.DEFAULT_DATA_SOURCE_NAME;
@@ -35,14 +35,16 @@ import org.junit.Before;
 import org.junit.Test;
 import org.neo4j.backup.OnlineBackupSettings;
 import org.neo4j.com.Response;
-import org.neo4j.com.SlaveContext;
-import org.neo4j.com.SlaveContext.Tx;
+import org.neo4j.com.RequestContext;
+import org.neo4j.com.RequestContext.Tx;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.configuration.ConfigurationDefaults;
 import org.neo4j.kernel.ha.HaSettings;
+import org.neo4j.kernel.ha.MasterClientResolver;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
+import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.test.ha.LocalhostZooKeeperCluster;
 
 public class TestZooKeeperMasterElectionBlackBox
@@ -216,7 +218,7 @@ public class TestZooKeeperMasterElectionBlackBox
         Instance( int id, StoreId storeId, String storeDir )
         {
             this.id = id;
-            this.client = new ZooKeeperMasterElectionClient( this, config( id ), storeId, storeDir )
+            this.client = new ZooKeeperMasterElectionClient( this, config( id ), storeId, storeDir, new MasterClientResolver( StringLogger.SYSTEM, 10, 10, 10 ) )
             {
                 @Override
                 public int getMasterForTx( long tx )
@@ -271,19 +273,19 @@ public class TestZooKeeperMasterElectionBlackBox
         }
 
         @Override
-        public SlaveContext getSlaveContext( int eventIdentifier )
+        public RequestContext getRequestContext( int eventIdentifier )
         {
-            return new SlaveContext( 0, id, eventIdentifier, new Tx[] { lastAppliedTx( DEFAULT_DATA_SOURCE_NAME, lastTx ) }, masterIdForLastTx, 0 );
+            return new RequestContext( 0, id, eventIdentifier, new Tx[] { lastAppliedTx( DEFAULT_DATA_SOURCE_NAME, lastTx ) }, masterIdForLastTx, 0 );
         }
 
         @Override
-        public SlaveContext getSlaveContext( XaDataSource dataSource )
+        public RequestContext getRequestContext( XaDataSource dataSource )
         {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public SlaveContext getSlaveContext()
+        public RequestContext getRequestContext()
         {
             throw new UnsupportedOperationException();
         }

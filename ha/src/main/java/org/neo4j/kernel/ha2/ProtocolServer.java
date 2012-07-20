@@ -121,13 +121,13 @@ public class ProtocolServer
     public String toString()
     {
         StringWriter stringWriter = new StringWriter();
-        PrintWriter out = new PrintWriter( stringWriter, true);
-        out.printf( "Me:%s \n", me.toString() );
-
-        for( StateMachine stateMachine : connectedStateMachines.getStateMachines() )
-        {
-            out.println( "  "+stateMachine);
-        }
+//        PrintWriter out = new PrintWriter( stringWriter, true);
+//        out.printf( "Me:%s \n", me.toString() );
+//
+//        for( StateMachine stateMachine : connectedStateMachines.getStateMachines() )
+//        {
+//            out.println( "  "+stateMachine);
+//        }
         return stringWriter.toString();
     }
 

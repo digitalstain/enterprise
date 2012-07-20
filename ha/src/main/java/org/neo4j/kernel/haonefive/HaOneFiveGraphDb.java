@@ -29,26 +29,27 @@ import java.util.Map;
 import javax.transaction.SystemException;
 import javax.transaction.Transaction;
 
-import org.neo4j.com.Client.ConnectionLostHandler;
-import org.neo4j.com.MasterUtil;
+import org.neo4j.com.ConnectionLostHandler;
+import org.neo4j.com.ServerUtil;
+import org.neo4j.com.RequestContext;
 import org.neo4j.com.Response;
-import org.neo4j.com.SlaveContext;
-import org.neo4j.com.SlaveContext.Tx;
+import org.neo4j.com.RequestContext.Tx;
 import org.neo4j.com.ToFileStoreWriter;
 import org.neo4j.com.TxChecksumVerifier;
 import org.neo4j.graphdb.index.IndexProvider;
 import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.Service;
 import org.neo4j.helpers.Triplet;
-import org.neo4j.kernel.AbstractGraphDatabase;
 import org.neo4j.kernel.BranchedDataPolicy;
 import org.neo4j.kernel.IdGeneratorFactory;
+import org.neo4j.kernel.InternalAbstractGraphDatabase;
 import org.neo4j.kernel.KernelExtension;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.configuration.ConfigurationDefaults;
 import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.Master;
-import org.neo4j.kernel.ha.MasterClient;
+import org.neo4j.kernel.ha.MasterClient18;
+import org.neo4j.kernel.ha.MasterClientResolver;
 import org.neo4j.kernel.ha.MasterImpl;
 import org.neo4j.kernel.ha.MasterServer;
 import org.neo4j.kernel.impl.cache.CacheProvider;
@@ -59,7 +60,7 @@ import org.neo4j.kernel.impl.transaction.TxHook;
 import org.neo4j.kernel.impl.transaction.xaframework.TxIdGenerator;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 
-public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterChangeListener
+public class HaOneFiveGraphDb extends InternalAbstractGraphDatabase implements MasterChangeListener
 {
     private static final int DEFAULT_STATE_SWITCH_TIMEOUT = 20;
     
@@ -93,7 +94,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             {
                 try
                 {
-                    MasterUtil.applyReceivedTransactions( response, HaOneFiveGraphDb.this, MasterUtil.NO_ACTION );
+                    ServerUtil.applyReceivedTransactions( response, HaOneFiveGraphDb.this, ServerUtil.NO_ACTION );
                     lastUpdated = System.currentTimeMillis();
                 }
                 catch ( IOException e )
@@ -103,21 +104,22 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             }
             
             @Override
-            public SlaveContext getSlaveContext()
+            public RequestContext getRequestContext()
             {
-                return getSlaveContext( txManager.getEventIdentifier() );
+                return getRequestContext( txManager.getEventIdentifier() );
             }
             
             @Override
-            public SlaveContext getSlaveContext( XaDataSource dataSource )
+            public RequestContext getRequestContext( XaDataSource dataSource )
             {
-                return MasterUtil.getSlaveContext( dataSource, sessionTimestamp, serverId, txManager.getEventIdentifier() );
+                return ServerUtil.getRequestContext( dataSource, sessionTimestamp, serverId,
+                        txManager.getEventIdentifier() );
             }
             
             @Override
-            public SlaveContext getSlaveContext( int eventIdentifier )
+            public RequestContext getRequestContext( int eventIdentifier )
             {
-                return MasterUtil.getSlaveContext( xaDataSourceManager, sessionTimestamp, serverId, eventIdentifier );
+                return ServerUtil.getRequestContext( xaDataSourceManager, sessionTimestamp, serverId, eventIdentifier );
             }
         };
         
@@ -165,10 +167,8 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         run();
     }
     
-    @Override
     protected void create()
     {
-        super.create();
         masterElectionClient = life.add( createMasterElectionClient() );
         masterElectionClient.addMasterChangeListener( this );
     }
@@ -202,14 +202,18 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
 
     protected MasterElectionClient createMasterElectionClient()
     {
-        return new ZooKeeperMasterElectionClient( requestSupport, config, storeId, storeDir )
+        return new ZooKeeperMasterElectionClient( requestSupport, config, storeId, storeDir,
+                new MasterClientResolver( getMessageLog(), config.get( HaSettings.read_timeout ),
+                        config.get( HaSettings.lock_read_timeout ),
+                        config.get( HaSettings.max_concurrent_channels_per_slave ) ) )
         {
             @Override
             public int getMasterForTx( long tx )
             {
                 try
                 {
-                    return getXaDataSourceManager().getNeoStoreDataSource().getMasterForCommittedTx( tx ).first().intValue();
+                    return getXaDataSourceManager().getNeoStoreDataSource().getMasterForCommittedTx( tx ).first()
+                            .intValue();
                 }
                 catch ( IOException e )
                 {
@@ -322,7 +326,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     
     public void pullUpdates()
     {
-        Response<Void> response = master.pullUpdates( requestSupport.getSlaveContext() );
+        Response<Void> response = master.pullUpdates( requestSupport.getRequestContext() );
         requestSupport.receive( response );
     }
 
@@ -529,7 +533,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         {
             // TODO Wrap returned Master in something that handles exceptions (network a.s.o.)
             // and feeds back to master election black box if we decide to have input channels to it.
-            return new MasterClient( masterIp, masterPort, db.getMessageLog(), db.getStoreId(),
+            return new MasterClient18( masterIp, masterPort, db.getMessageLog(), db.getStoreId(),
                     new ConnectionFailureHandler( db ), 20, 20, 20 );
         }
 
@@ -552,7 +556,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         try
         {
             policy.handle( this );
-            SlaveContext context = new SlaveContext( 0, serverId, 0, new Tx[0], 0, 0 );
+            RequestContext context = new RequestContext( 0, serverId, 0, new Tx[0], 0, 0 );
             Response<Void> response = master.copyStore( context, new ToFileStoreWriter( storeDir ) );
             requestSupport.receive( response );
         }

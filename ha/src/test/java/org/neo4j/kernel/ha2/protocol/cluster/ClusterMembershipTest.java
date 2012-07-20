@@ -57,9 +57,22 @@ public class ClusterMembershipTest
              join( 100,2 ).
              join( 100,3 ).
              message( 100,"*** Cluster formed, now leave" ).
+             verifyConfigurations( 0 ).sleep( 100 ).
              leave( 0, 1 ).
-             leave( 100, 2 ).
-             leave( 100, 3 ));
+             leave( 100, 2 )/*.
+             leave( 100, 3 )*/);
+    }
+
+    @Test
+    public void noobTest()
+            throws URISyntaxException, ExecutionException, TimeoutException, InterruptedException
+    {
+        testCluster(1, DEFAULT_NETWORK(), new ClusterTestScriptDSL().
+                rounds( 3 ).
+                sleep( 10 ).
+                join( 0, 1 ).
+                message( 0,"*** Cluster formed, now leave" ).
+                leave( 0, 1 ).verifyConfigurations( 0 ));
     }
 
     @Test

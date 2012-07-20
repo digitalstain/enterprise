@@ -147,7 +147,7 @@ public class NetworkNodeTCP
         {
             try
             {
-                channel = serverBootstrap.bind(new InetSocketAddress( config.get( Configuration.cluster_address ), checkPort));
+                channel = serverBootstrap.bind(new InetSocketAddress( config.get( Configuration.cluster_address.name() ), checkPort));
                 listeningAt( ( getURI( (InetSocketAddress) channel.getLocalAddress() ) ) );
 
 

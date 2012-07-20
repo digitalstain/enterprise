@@ -24,11 +24,12 @@ import static org.neo4j.kernel.haonefive.UrlUtil.toUrl;
 import java.net.URL;
 
 import org.neo4j.com.Response;
-import org.neo4j.com.SlaveContext;
+import org.neo4j.com.RequestContext;
 import org.neo4j.kernel.InformativeStackTrace;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha.Broker;
 import org.neo4j.kernel.ha.ClusterEventReceiver;
+import org.neo4j.kernel.ha.MasterClientFactory;
 import org.neo4j.kernel.ha.SlaveDatabaseOperations;
 import org.neo4j.kernel.ha.shell.ZooClientFactory;
 import org.neo4j.kernel.ha.zookeeper.Machine;
@@ -49,14 +50,16 @@ public abstract class ZooKeeperMasterElectionClient extends AbstractMasterElecti
     private final String storeDir;
     private Machine currentMaster = ZooKeeperMachine.NO_MACHINE;
     private final ComRequestSupport requestSupport;
-    
+    private MasterClientFactory masterClientFactory;
+
     public ZooKeeperMasterElectionClient( ComRequestSupport requestSupport, Config config, StoreId storeId,
-            String storeDir )
+            String storeDir, MasterClientFactory clientFactory )
     {
         this.requestSupport = requestSupport;
         this.config = config;
         this.storeId = storeId;
         this.storeDir = storeDir;
+        this.masterClientFactory = clientFactory;
     }
     
     private boolean figureOutCurrentMaster()
@@ -84,7 +87,7 @@ public abstract class ZooKeeperMasterElectionClient extends AbstractMasterElecti
     @Override
     public ZooClient newZooClient()
     {
-        zooClient = new ZooClient( storeDir, StringLogger.SYSTEM, config, this, this );
+        zooClient = new ZooClient( storeDir, StringLogger.SYSTEM, config, this, this, masterClientFactory );
         return zooClient;
     }
 
@@ -94,9 +97,9 @@ public abstract class ZooKeeperMasterElectionClient extends AbstractMasterElecti
     }
 
     @Override
-    public SlaveContext getSlaveContext( int eventIdentifier )
+    public RequestContext getRequestContext( int eventIdentifier )
     {
-        return requestSupport.getSlaveContext( eventIdentifier );
+        return requestSupport.getRequestContext( eventIdentifier );
     }
 
     @Override

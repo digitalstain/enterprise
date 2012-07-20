@@ -37,7 +37,7 @@ public class Response<T>
         this.releaser = releaser;
     }
 
-    public T response() throws MasterFailureException
+    public T response() throws ServerFailureException
     {
         return response;
     }
@@ -63,4 +63,7 @@ public class Response<T>
             releaser.release();
         }
     }
+
+    public static final Response<Void> EMPTY = new Response<Void>( null, new StoreId( -1, -1, -1 ),
+            TransactionStream.EMPTY, ResourceReleaser.NO_OP );
 }

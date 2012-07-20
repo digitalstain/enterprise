@@ -76,7 +76,9 @@ public class NetworkMock
 
     protected TestProtocolServer newTestProtocolServer(URI serverId)
     {
-        TestProtocolServer protocolServer = new TestProtocolServer( timeoutStrategy, factory, serverId, new InMemoryAcceptorInstanceStore(), new ServerIdElectionCredentialsProvider() );
+        ServerIdElectionCredentialsProvider electionCredentialsProvider = new ServerIdElectionCredentialsProvider();
+        electionCredentialsProvider.listeningAt( serverId );
+        TestProtocolServer protocolServer = new TestProtocolServer( timeoutStrategy, factory, serverId, new InMemoryAcceptorInstanceStore(), electionCredentialsProvider );
         protocolServer.addStateTransitionListener( new StateTransitionLogger( serverId.toString() ) );
         return protocolServer;
     }

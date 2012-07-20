@@ -45,7 +45,7 @@ public class HaTxHook implements TxHook
     @Override
     public void initializeTransaction( int eventIdentifier )
     {
-        Response<Void> response = master.initializeTx( requestSupport.getSlaveContext( eventIdentifier ) );
+        Response<Void> response = master.initializeTx( requestSupport.getRequestContext( eventIdentifier ) );
         requestSupport.receive( response );
     }
 
@@ -59,7 +59,7 @@ public class HaTxHook implements TxHook
     public void finishTransaction( int eventIdentifier, boolean success )
     {
         Response<Void> response = master.finishTransaction(
-                requestSupport.getSlaveContext( eventIdentifier ), success );
+                requestSupport.getRequestContext( eventIdentifier ), success );
         requestSupport.receive( response );
     }
 

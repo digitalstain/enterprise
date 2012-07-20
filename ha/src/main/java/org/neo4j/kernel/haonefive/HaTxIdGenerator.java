@@ -52,10 +52,15 @@ public class HaTxIdGenerator implements TxIdGenerator
     public long generate( XaDataSource dataSource, int identifier )
     {
         Response<Long> response = master.commitSingleResourceTransaction(
-                requestSupport.getSlaveContext( dataSource ), dataSource.getName(),
+                requestSupport.getRequestContext( dataSource ), dataSource.getName(),
                 myPreparedTransactionToCommit( dataSource, identifier ) );
         requestSupport.receive( response );
         return response.response().longValue();
+    }
+
+    @Override
+    public void committed( XaDataSource dataSource, int identifier, long txId, Integer externalAuthorServerId )
+    {
     }
 
     private TxExtractor myPreparedTransactionToCommit( final XaDataSource dataSource, final int identifier )
@@ -93,5 +98,25 @@ public class HaTxIdGenerator implements TxIdGenerator
     public int getMyId()
     {
         return serverId;
+    }
+
+    @Override
+    public void init() throws Throwable
+    {
+    }
+
+    @Override
+    public void start() throws Throwable
+    {
+    }
+
+    @Override
+    public void stop() throws Throwable
+    {
+    }
+
+    @Override
+    public void shutdown() throws Throwable
+    {
     }
 }

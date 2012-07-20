@@ -80,7 +80,7 @@ public enum ElectionState
                         if( context.getClusterContext().isInCluster() )
                         {
 
-                            // Start election process for all roles that this node hade
+                            // Start election process for all roles that this node had
                             for( String role : context.getRoles( demoteNode ) )
                             {
                                 if( !context.isElectionProcessInProgress( role ) )
