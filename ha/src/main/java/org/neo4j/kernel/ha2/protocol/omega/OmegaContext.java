@@ -1,3 +1,22 @@
+/**
+ * Copyright (c) 2002-2012 "Neo Technology,"
+ * Network Engine for Objects in Lund AB [http://neotechnology.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Neo4j is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.neo4j.kernel.ha2.protocol.omega;
 
 import java.net.URI;
@@ -9,6 +28,8 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
+import org.neo4j.kernel.ha2.protocol.omega.state.State;
+import org.neo4j.kernel.ha2.protocol.omega.state.View;
 
 public class OmegaContext
 {
@@ -31,6 +52,41 @@ public class OmegaContext
         return registry.get( clusterContext.getMe() );
     }
 
+    public View getMyView()
+    {
+        return views.get( clusterContext.getMe() );
+    }
+
+    public int startCollectionRound()
+    {
+        return 0;  //To change body of created methods use File | Settings | File Templates.
+    }
+
+    public Map<URI, View> getPreviousViewForCollectionRound( int newCollectionRound )
+    {
+        return null;  //To change body of created methods use File | Settings | File Templates.
+    }
+
+    public int getStatusResponsesForRound( int newCollectionRound )
+    {
+        return 0;  //To change body of created methods use File | Settings | File Templates.
+    }
+
+    public Map<URI, View> getViews()
+    {
+        return views;
+    }
+
+    public void collectionRoundDone( int firstCollectionRound )
+    {
+
+    }
+
+    public void responseReceivedForRound( int firstCollectionRound )
+    {
+
+    }
+
     private static final class RefreshRoundContext
     {
         int acksReceived;
@@ -38,9 +94,9 @@ public class OmegaContext
 
     private final SortedMap<Integer, RefreshRoundContext> refreshContexts = new TreeMap<Integer, RefreshRoundContext>();
 
-    public int getAckCount( int i )
+    public int getAckCount( int forRound )
     {
-        RefreshRoundContext context = refreshContexts.get( i );
+        RefreshRoundContext context = refreshContexts.get( forRound );
         if (context == null)
         {
             return -1;
@@ -60,36 +116,6 @@ public class OmegaContext
         refreshContexts.get( forRound ).acksReceived++;
     }
 
-    static final class EpochNumber implements Comparable<EpochNumber>
-    {
-        int serialNum;
-        int processId;
-
-        @Override
-        public int compareTo( EpochNumber o )
-        {
-            return serialNum == o.serialNum ? processId - o.processId : serialNum - o.serialNum;
-        }
-    }
-
-    static final class State implements Comparable<State>
-    {
-        EpochNumber epochNum;
-        int freshness;
-
-        @Override
-        public int compareTo( State o )
-        {
-            return epochNum.compareTo( o.epochNum ) == 0 ? freshness - o.freshness : epochNum.compareTo( o.epochNum );
-        }
-    }
-
-    static final class View
-    {
-        State state;
-        boolean expired = true;
-    }
-
     private final Map<URI, State> registry = new HashMap<URI, State>();
     private final Map<URI, View> views = new HashMap<URI, View>();
     private final List<OmegaListener> listeners = new ArrayList<OmegaListener>();
@@ -102,6 +128,11 @@ public class OmegaContext
        this.clusterContext = clusterContext;
     }
 
+    public ClusterContext getClusterContext()
+    {
+        return clusterContext;
+    }
+
     public void addListener( OmegaListener  listener )
     {
         listeners.add( listener );
@@ -110,5 +141,15 @@ public class OmegaContext
     public void removeListener( OmegaListener  listener )
     {
         listeners.remove( listener );
+    }
+
+    public int getClusterNodeCount()
+    {
+        return getClusterContext().getConfiguration().getNodes().size();
+    }
+
+    public Map<URI, State> getRegistry()
+    {
+        return registry;
     }
 }

@@ -1,11 +1,32 @@
+/**
+ * Copyright (c) 2002-2012 "Neo Technology,"
+ * Network Engine for Objects in Lund AB [http://neotechnology.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Neo4j is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.neo4j.kernel.ha2.protocol.omega;
 
 import java.io.Serializable;
 import java.net.URI;
-import java.util.List;
 import java.util.Map;
 
 import org.neo4j.com_2.message.MessageType;
+import org.neo4j.helpers.Pair;
+import org.neo4j.kernel.ha2.protocol.omega.state.EpochNumber;
+import org.neo4j.kernel.ha2.protocol.omega.state.State;
 
 public enum OmegaMessage implements MessageType
 {
@@ -16,7 +37,7 @@ public enum OmegaMessage implements MessageType
     /*
      * The required timeouts
      */
-    refreshTimeout, roundTripTimeout, readTimeout,
+    refresh_timeout, round_trip_timeout, read_timeout,
     /*
      * The refresh request, where we send our state to
      * f other processes
@@ -36,58 +57,4 @@ public enum OmegaMessage implements MessageType
      * back the registry
      */
     status;
-
-    public static final class RefreshPayload implements Serializable
-    {
-        public final int serialNum;
-        public final int processId;
-        public final int freshness;
-        public final int refreshRound;
-
-        public RefreshPayload( int serialNum, int processId, int freshness, int refreshRound )
-        {
-            this.serialNum = serialNum;
-            this.processId = processId;
-            this.freshness = freshness;
-            this.refreshRound = refreshRound;
-        }
-
-        public static RefreshPayload fromState(OmegaContext.State state, int refreshRound )
-        {
-            return new RefreshPayload( state.epochNum.serialNum, state.epochNum.processId, state.freshness, refreshRound );
-        }
-
-        public static int toState( RefreshPayload payload, OmegaContext.State state )
-        {
-            state.epochNum.serialNum = payload.serialNum;
-            state.epochNum.processId = payload.processId;
-            state.freshness = payload.freshness;
-            return payload.refreshRound;
-        }
-    }
-
-    public static final class CollectPayload implements Serializable
-    {
-        public final URI[] servers;
-        public final RefreshPayload[] registry;
-
-        public CollectPayload( URI[] servers, RefreshPayload[] registry )
-        {
-            this.servers = servers;
-            this.registry = registry;
-        }
-
-        public static CollectPayload fromRegistry( Map<URI, OmegaContext.State> registry )
-        {
-            URI[] servers = new URI[registry.size()];
-            RefreshPayload[] refreshPayloads = new RefreshPayload[registry.size()];
-            int currentIndex = 0;
-            for (Map.Entry<URI, OmegaContext.State> entry : registry.entrySet())
-            {
-                servers[currentIndex] = entry.getKey();
-                refreshPayloads[currentIndex] = RefreshPayload.fromState( entry.getValue(), -1 );
-            }
-            return new CollectPayload( servers, refreshPayloads );
-        }
-    }
 }
